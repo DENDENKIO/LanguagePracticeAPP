@@ -5,7 +5,10 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -16,10 +19,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.languagepracticev3.data.model.LengthProfile
-import com.example.languagepracticev3.data.model.OperationKind
+import com.example.languagepracticev3.data.model.*
 import com.example.languagepracticev3.ui.screens.aibrowser.AiBrowserScreen
 import com.example.languagepracticev3.viewmodel.SaveResult
 import com.example.languagepracticev3.viewmodel.WorkbenchViewModel
@@ -37,7 +40,13 @@ fun WorkbenchScreen(
     var showPromptDialog by remember { mutableStateOf(false) }
     var showOutputDialog by remember { mutableStateOf(false) }
 
-    // AIブラウザ画面の表示（設定で保存されたAIサイトを使用）
+    // ★ピッカーダイアログ用の状態
+    var showPersonaPicker by remember { mutableStateOf(false) }
+    var showTopicPicker by remember { mutableStateOf(false) }
+    var showWorkPicker by remember { mutableStateOf(false) }
+    var pickerTarget by remember { mutableStateOf<PickerTarget>(PickerTarget.WRITER) }
+
+    // AIブラウザ画面の表示
     if (uiState.showAiBrowser) {
         AiBrowserScreen(
             siteProfile = uiState.aiSiteProfile,
@@ -130,10 +139,20 @@ fun WorkbenchScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 動的入力フィールド
+        // ★動的入力フィールド（ピッカーコールバック付き）
         DynamicInputFields(
             uiState = uiState,
-            viewModel = viewModel
+            viewModel = viewModel,
+            onPickPersona = { target ->
+                pickerTarget = target
+                showPersonaPicker = true
+            },
+            onPickTopic = {
+                showTopicPicker = true
+            },
+            onPickWork = {
+                showWorkPicker = true
+            }
         )
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -168,6 +187,48 @@ fun WorkbenchScreen(
         }
     }
 
+    // ★ペルソナピッカーダイアログ
+    if (showPersonaPicker) {
+        PersonaPickerDialog(
+            viewModel = viewModel,
+            onSelect = { persona ->
+                when (pickerTarget) {
+                    PickerTarget.WRITER -> viewModel.updateInputWriter(persona.name)
+                    PickerTarget.TARGET_PERSONA -> {
+                        viewModel.updateInputTargetPersonaName(persona.name)
+                        viewModel.updateInputTargetPersonaBio(persona.bio)
+                    }
+                }
+                showPersonaPicker = false
+            },
+            onDismiss = { showPersonaPicker = false }
+        )
+    }
+
+    // ★トピックピッカーダイアログ
+    if (showTopicPicker) {
+        TopicPickerDialog(
+            viewModel = viewModel,
+            onSelect = { topic ->
+                viewModel.updateInputTopic(topic.title)
+                showTopicPicker = false
+            },
+            onDismiss = { showTopicPicker = false }
+        )
+    }
+
+    // ★作品ピッカーダイアログ（ソーステキスト用）
+    if (showWorkPicker) {
+        WorkPickerDialog(
+            viewModel = viewModel,
+            onSelect = { work ->
+                viewModel.updateInputSourceText(work.bodyText ?: "")
+                showWorkPicker = false
+            },
+            onDismiss = { showWorkPicker = false }
+        )
+    }
+
     // ダイアログ類
     if (showPromptDialog) {
         PromptDialog(
@@ -192,6 +253,316 @@ fun WorkbenchScreen(
     }
 }
 
+// ★ピッカーターゲット
+enum class PickerTarget {
+    WRITER,
+    TARGET_PERSONA
+}
+
+// ====================
+// ★ペルソナピッカーダイアログ
+// ====================
+@Composable
+private fun PersonaPickerDialog(
+    viewModel: WorkbenchViewModel,
+    onSelect: (Persona) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val personas by viewModel.allPersonas.collectAsState()
+    var searchQuery by remember { mutableStateOf("") }
+
+    val filteredPersonas = remember(personas, searchQuery) {
+        if (searchQuery.isBlank()) {
+            personas
+        } else {
+            personas.filter {
+                it.name.contains(searchQuery, ignoreCase = true) ||
+                        it.tags.contains(searchQuery, ignoreCase = true)
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("ペルソナを選択") },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("検索...") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    leadingIcon = { Icon(Icons.Default.Search, null) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Clear, "クリア")
+                            }
+                        }
+                    }
+                )
+                Spacer(Modifier.height(8.dp))
+
+                if (filteredPersonas.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            if (personas.isEmpty()) "ペルソナがありません\n作業台で生成してください"
+                            else "該当するペルソナがありません",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(300.dp)
+                    ) {
+                        items(filteredPersonas, key = { it.id }) { persona ->
+                            ListItem(
+                                headlineContent = { Text(persona.name) },
+                                supportingContent = {
+                                    Column {
+                                        Text(
+                                            persona.location,
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        Text(
+                                            persona.bio.take(60) + if (persona.bio.length > 60) "..." else "",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                },
+                                trailingContent = {
+                                    val statusColor = when(persona.verificationStatus) {
+                                        "VERIFIED" -> MaterialTheme.colorScheme.primary
+                                        "PARTIALLY_VERIFIED" -> MaterialTheme.colorScheme.tertiary
+                                        else -> MaterialTheme.colorScheme.outline
+                                    }
+                                    Text(
+                                        persona.verificationStatus.take(3),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = statusColor
+                                    )
+                                },
+                                modifier = Modifier.clickable { onSelect(persona) }
+                            )
+                            HorizontalDivider()
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("キャンセル") }
+        }
+    )
+}
+
+// ====================
+// ★トピックピッカーダイアログ
+// ====================
+@Composable
+private fun TopicPickerDialog(
+    viewModel: WorkbenchViewModel,
+    onSelect: (Topic) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val topics by viewModel.allTopics.collectAsState()
+    var searchQuery by remember { mutableStateOf("") }
+
+    val filteredTopics = remember(topics, searchQuery) {
+        if (searchQuery.isBlank()) {
+            topics
+        } else {
+            topics.filter {
+                it.title.contains(searchQuery, ignoreCase = true) ||
+                        it.tags.contains(searchQuery, ignoreCase = true) ||
+                        it.emotion.contains(searchQuery, ignoreCase = true)
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("トピックを選択") },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("検索...") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    leadingIcon = { Icon(Icons.Default.Search, null) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Clear, "クリア")
+                            }
+                        }
+                    }
+                )
+                Spacer(Modifier.height(8.dp))
+
+                if (filteredTopics.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            if (topics.isEmpty()) "トピックがありません\n作業台で生成してください"
+                            else "該当するトピックがありません",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(300.dp)
+                    ) {
+                        items(filteredTopics, key = { it.id }) { topic ->
+                            ListItem(
+                                headlineContent = { Text(topic.title) },
+                                supportingContent = {
+                                    Column {
+                                        Text(
+                                            "Emotion: ${topic.emotion} | Scene: ${topic.scene}",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        if (topic.tags.isNotBlank()) {
+                                            Text(
+                                                topic.tags,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.clickable { onSelect(topic) }
+                            )
+                            HorizontalDivider()
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("キャンセル") }
+        }
+    )
+}
+
+// ====================
+// ★作品ピッカーダイアログ（ソーステキスト用）
+// ====================
+@Composable
+private fun WorkPickerDialog(
+    viewModel: WorkbenchViewModel,
+    onSelect: (Work) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val works by viewModel.allWorks.collectAsState()
+    var searchQuery by remember { mutableStateOf("") }
+
+    val filteredWorks = remember(works, searchQuery) {
+        if (searchQuery.isBlank()) {
+            works
+        } else {
+            works.filter {
+                (it.title ?: "").contains(searchQuery, ignoreCase = true) ||
+                        (it.bodyText ?: "").contains(searchQuery, ignoreCase = true)
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("作品を選択（ソーステキスト）") },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("検索...") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    leadingIcon = { Icon(Icons.Default.Search, null) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Clear, "クリア")
+                            }
+                        }
+                    }
+                )
+                Spacer(Modifier.height(8.dp))
+
+                if (filteredWorks.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            if (works.isEmpty()) "作品がありません"
+                            else "該当する作品がありません",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(300.dp)
+                    ) {
+                        items(filteredWorks, key = { it.id }) { work ->
+                            ListItem(
+                                headlineContent = {
+                                    Text(work.title ?: "(無題)")
+                                },
+                                supportingContent = {
+                                    Text(
+                                        (work.bodyText ?: "").take(80) + "...",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                },
+                                trailingContent = {
+                                    Text(
+                                        work.kind.take(8),
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
+                                },
+                                modifier = Modifier.clickable { onSelect(work) }
+                            )
+                            HorizontalDivider()
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("キャンセル") }
+        }
+    )
+}
+
 // ====================
 // 操作種別セレクター
 // ====================
@@ -214,7 +585,7 @@ private fun OperationSelector(
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
                 .fillMaxWidth()
-                .menuAnchor()
+                .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
         )
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             OperationKind.entries.forEach { op ->
@@ -228,48 +599,89 @@ private fun OperationSelector(
 }
 
 // ====================
-// 動的入力フィールド
+// ★動的入力フィールド（ピッカーボタン付き）
 // ====================
 @Composable
 private fun DynamicInputFields(
     uiState: WorkbenchUiState,
-    viewModel: WorkbenchViewModel
+    viewModel: WorkbenchViewModel,
+    onPickPersona: (PickerTarget) -> Unit,
+    onPickTopic: () -> Unit,
+    onPickWork: () -> Unit
 ) {
     when (uiState.selectedOperation) {
-        OperationKind.TEXT_GEN -> TextGenInputs(uiState, viewModel)
-        OperationKind.STUDY_CARD -> StudyCardInputs(uiState, viewModel)
+        OperationKind.TEXT_GEN -> TextGenInputs(uiState, viewModel, onPickPersona, onPickTopic)
+        OperationKind.STUDY_CARD -> StudyCardInputs(uiState, viewModel, onPickWork)
         OperationKind.PERSONA_GEN -> PersonaGenInputs(uiState, viewModel)
         OperationKind.TOPIC_GEN -> TopicGenInputs(uiState, viewModel)
         OperationKind.OBSERVE_IMAGE -> ObserveImageInputs(uiState, viewModel)
-        OperationKind.CORE_EXTRACT -> CoreExtractInputs(uiState, viewModel)
-        OperationKind.GIKO -> GikoInputs(uiState, viewModel)
-        OperationKind.REVISION_FULL -> RevisionInputs(uiState, viewModel)
-        OperationKind.PERSONA_VERIFY_ASSIST -> PersonaVerifyInputs(uiState, viewModel)
-        else -> GenericInputs(uiState, viewModel)
+        OperationKind.CORE_EXTRACT -> CoreExtractInputs(uiState, viewModel, onPickWork)
+        OperationKind.GIKO -> GikoInputs(uiState, viewModel, onPickWork)
+        OperationKind.REVISION_FULL -> RevisionInputs(uiState, viewModel, onPickWork)
+        OperationKind.PERSONA_VERIFY_ASSIST -> PersonaVerifyInputs(uiState, viewModel, onPickPersona)
+        else -> GenericInputs(uiState, viewModel, onPickTopic, onPickWork)
     }
 }
 
+// ★テキスト入力 + ピッカーボタン付きのコンポーネント
 @Composable
-private fun TextGenInputs(uiState: WorkbenchUiState, viewModel: WorkbenchViewModel) {
+private fun TextFieldWithPicker(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    onPick: () -> Unit,
+    modifier: Modifier = Modifier,
+    singleLine: Boolean = true,
+    minLines: Int = 1
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        modifier = modifier,
+        singleLine = singleLine,
+        minLines = minLines,
+        trailingIcon = {
+            IconButton(onClick = onPick) {
+                Icon(Icons.Default.Folder, "ライブラリから選択")
+            }
+        }
+    )
+}
+
+@Composable
+private fun TextGenInputs(
+    uiState: WorkbenchUiState,
+    viewModel: WorkbenchViewModel,
+    onPickPersona: (PickerTarget) -> Unit,
+    onPickTopic: () -> Unit
+) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        OutlinedTextField(
+        // ★トピック（ピッカー付き）
+        TextFieldWithPicker(
             value = uiState.inputTopic,
             onValueChange = viewModel::updateInputTopic,
-            label = { Text("トピック / お題 *") },
+            label = "トピック / お題 *",
+            onPick = onPickTopic,
             modifier = Modifier.fillMaxWidth()
         )
-        OutlinedTextField(
+
+        // ★書き手（ペルソナピッカー付き）
+        TextFieldWithPicker(
             value = uiState.inputWriter,
             onValueChange = viewModel::updateInputWriter,
-            label = { Text("書き手 (Persona名)") },
+            label = "書き手 (Persona名)",
+            onPick = { onPickPersona(PickerTarget.WRITER) },
             modifier = Modifier.fillMaxWidth()
         )
+
         OutlinedTextField(
             value = uiState.inputReader,
             onValueChange = viewModel::updateInputReader,
             label = { Text("読者像") },
             modifier = Modifier.fillMaxWidth()
         )
+
         LengthSelector(
             selected = uiState.selectedLength,
             onSelect = viewModel::updateSelectedLength
@@ -278,17 +690,36 @@ private fun TextGenInputs(uiState: WorkbenchUiState, viewModel: WorkbenchViewMod
 }
 
 @Composable
-private fun StudyCardInputs(uiState: WorkbenchUiState, viewModel: WorkbenchViewModel) {
+private fun StudyCardInputs(
+    uiState: WorkbenchUiState,
+    viewModel: WorkbenchViewModel,
+    onPickWork: () -> Unit
+) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        OutlinedTextField(
-            value = uiState.inputSourceText,
-            onValueChange = viewModel::updateInputSourceText,
-            label = { Text("対象本文 *") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 150.dp),
-            minLines = 5
-        )
+        // ★対象本文（作品ピッカー付き）
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("対象本文 *", style = MaterialTheme.typography.bodySmall)
+                TextButton(onClick = onPickWork) {
+                    Icon(Icons.Default.Folder, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("作品から選択")
+                }
+            }
+            OutlinedTextField(
+                value = uiState.inputSourceText,
+                onValueChange = viewModel::updateInputSourceText,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 150.dp),
+                minLines = 5,
+                placeholder = { Text("対象本文を入力、または作品から選択") }
+            )
+        }
         OutlinedTextField(
             value = uiState.inputReader,
             onValueChange = viewModel::updateInputReader,
@@ -329,17 +760,36 @@ private fun ObserveImageInputs(uiState: WorkbenchUiState, viewModel: WorkbenchVi
 }
 
 @Composable
-private fun CoreExtractInputs(uiState: WorkbenchUiState, viewModel: WorkbenchViewModel) {
+private fun CoreExtractInputs(
+    uiState: WorkbenchUiState,
+    viewModel: WorkbenchViewModel,
+    onPickWork: () -> Unit
+) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        OutlinedTextField(
-            value = uiState.inputSourceText,
-            onValueChange = viewModel::updateInputSourceText,
-            label = { Text("対象本文 *") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 150.dp),
-            minLines = 5
-        )
+        // ★対象本文（作品ピッカー付き）
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("対象本文 *", style = MaterialTheme.typography.bodySmall)
+                TextButton(onClick = onPickWork) {
+                    Icon(Icons.Default.Folder, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("作品から選択")
+                }
+            }
+            OutlinedTextField(
+                value = uiState.inputSourceText,
+                onValueChange = viewModel::updateInputSourceText,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 150.dp),
+                minLines = 5,
+                placeholder = { Text("対象本文を入力、または作品から選択") }
+            )
+        }
         OutlinedTextField(
             value = uiState.inputReader,
             onValueChange = viewModel::updateInputReader,
@@ -350,17 +800,36 @@ private fun CoreExtractInputs(uiState: WorkbenchUiState, viewModel: WorkbenchVie
 }
 
 @Composable
-private fun GikoInputs(uiState: WorkbenchUiState, viewModel: WorkbenchViewModel) {
+private fun GikoInputs(
+    uiState: WorkbenchUiState,
+    viewModel: WorkbenchViewModel,
+    onPickWork: () -> Unit
+) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        OutlinedTextField(
-            value = uiState.inputSourceText,
-            onValueChange = viewModel::updateInputSourceText,
-            label = { Text("元の現代文 *") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 150.dp),
-            minLines = 5
-        )
+        // ★元の現代文（作品ピッカー付き）
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("元の現代文 *", style = MaterialTheme.typography.bodySmall)
+                TextButton(onClick = onPickWork) {
+                    Icon(Icons.Default.Folder, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("作品から選択")
+                }
+            }
+            OutlinedTextField(
+                value = uiState.inputSourceText,
+                onValueChange = viewModel::updateInputSourceText,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 150.dp),
+                minLines = 5,
+                placeholder = { Text("元の現代文を入力、または作品から選択") }
+            )
+        }
         OutlinedTextField(
             value = uiState.inputToneLabel,
             onValueChange = viewModel::updateInputToneLabel,
@@ -386,17 +855,36 @@ private fun GikoInputs(uiState: WorkbenchUiState, viewModel: WorkbenchViewModel)
 }
 
 @Composable
-private fun RevisionInputs(uiState: WorkbenchUiState, viewModel: WorkbenchViewModel) {
+private fun RevisionInputs(
+    uiState: WorkbenchUiState,
+    viewModel: WorkbenchViewModel,
+    onPickWork: () -> Unit
+) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        OutlinedTextField(
-            value = uiState.inputSourceText,
-            onValueChange = viewModel::updateInputSourceText,
-            label = { Text("元原稿 *") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 150.dp),
-            minLines = 5
-        )
+        // ★元原稿（作品ピッカー付き）
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("元原稿 *", style = MaterialTheme.typography.bodySmall)
+                TextButton(onClick = onPickWork) {
+                    Icon(Icons.Default.Folder, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("作品から選択")
+                }
+            }
+            OutlinedTextField(
+                value = uiState.inputSourceText,
+                onValueChange = viewModel::updateInputSourceText,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 150.dp),
+                minLines = 5,
+                placeholder = { Text("元原稿を入力、または作品から選択") }
+            )
+        }
         OutlinedTextField(
             value = uiState.inputCoreSentence,
             onValueChange = viewModel::updateInputCoreSentence,
@@ -431,12 +919,18 @@ private fun RevisionInputs(uiState: WorkbenchUiState, viewModel: WorkbenchViewMo
 }
 
 @Composable
-private fun PersonaVerifyInputs(uiState: WorkbenchUiState, viewModel: WorkbenchViewModel) {
+private fun PersonaVerifyInputs(
+    uiState: WorkbenchUiState,
+    viewModel: WorkbenchViewModel,
+    onPickPersona: (PickerTarget) -> Unit
+) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        OutlinedTextField(
+        // ★ペルソナ名（ペルソナピッカー付き）
+        TextFieldWithPicker(
             value = uiState.inputTargetPersonaName,
             onValueChange = viewModel::updateInputTargetPersonaName,
-            label = { Text("ペルソナ名 *") },
+            label = "ペルソナ名 *",
+            onPick = { onPickPersona(PickerTarget.TARGET_PERSONA) },
             modifier = Modifier.fillMaxWidth()
         )
         OutlinedTextField(
@@ -461,23 +955,42 @@ private fun PersonaVerifyInputs(uiState: WorkbenchUiState, viewModel: WorkbenchV
 }
 
 @Composable
-private fun GenericInputs(uiState: WorkbenchUiState, viewModel: WorkbenchViewModel) {
+private fun GenericInputs(
+    uiState: WorkbenchUiState,
+    viewModel: WorkbenchViewModel,
+    onPickTopic: () -> Unit,
+    onPickWork: () -> Unit
+) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        OutlinedTextField(
+        TextFieldWithPicker(
             value = uiState.inputTopic,
             onValueChange = viewModel::updateInputTopic,
-            label = { Text("トピック / お題") },
+            label = "トピック / お題",
+            onPick = onPickTopic,
             modifier = Modifier.fillMaxWidth()
         )
-        OutlinedTextField(
-            value = uiState.inputSourceText,
-            onValueChange = viewModel::updateInputSourceText,
-            label = { Text("ソーステキスト") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 120.dp),
-            minLines = 4
-        )
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("ソーステキスト", style = MaterialTheme.typography.bodySmall)
+                TextButton(onClick = onPickWork) {
+                    Icon(Icons.Default.Folder, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("作品から選択")
+                }
+            }
+            OutlinedTextField(
+                value = uiState.inputSourceText,
+                onValueChange = viewModel::updateInputSourceText,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 120.dp),
+                minLines = 4
+            )
+        }
     }
 }
 
@@ -503,7 +1016,7 @@ private fun LengthSelector(
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
                 .fillMaxWidth()
-                .menuAnchor()
+                .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
         )
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             LengthProfile.entries.forEach { len ->
@@ -517,7 +1030,7 @@ private fun LengthSelector(
 }
 
 // ====================
-// アクションボタン群（AI選択を削除）
+// アクションボタン群
 // ====================
 @Composable
 private fun ActionButtons(
@@ -528,7 +1041,6 @@ private fun ActionButtons(
     onShowOutputDialog: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        // プロンプト生成ボタン
         Button(
             onClick = {
                 val error = viewModel.validateInput()
@@ -547,7 +1059,6 @@ private fun ActionButtons(
             Text("プロンプト生成")
         }
 
-        // AI画面へ送信ボタン（設定で保存されたAIを使用）
         Button(
             onClick = {
                 val error = viewModel.validateInput()
@@ -569,7 +1080,6 @@ private fun ActionButtons(
             Text("AI画面へ送信 → 自動取り込み")
         }
 
-        // 手動貼り付けボタン
         OutlinedButton(
             onClick = onShowOutputDialog,
             modifier = Modifier.fillMaxWidth(),

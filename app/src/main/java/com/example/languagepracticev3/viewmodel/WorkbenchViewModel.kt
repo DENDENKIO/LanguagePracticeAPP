@@ -9,8 +9,10 @@ import com.example.languagepracticev3.data.services.OutputParser
 import com.example.languagepracticev3.data.services.PromptBuilder
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
@@ -23,7 +25,7 @@ sealed class SaveResult {
     data class Error(val message: String) : SaveResult()
 }
 
-// UI状態（AI選択関連を削除）
+// UI状態
 data class WorkbenchUiState(
     val selectedOperation: OperationKind = OperationKind.TEXT_GEN,
     val inputTopic: String = "",
@@ -68,6 +70,16 @@ class WorkbenchViewModel @Inject constructor(
 
     private val promptBuilder = PromptBuilder()
     private val outputParser = OutputParser()
+
+    // ★ピッカー用データ（DAOから取得）
+    val allPersonas: StateFlow<List<Persona>> = personaDao.observeAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val allTopics: StateFlow<List<Topic>> = topicDao.observeAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val allWorks: StateFlow<List<Work>> = workDao.observeAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
         loadAiSettings()
@@ -119,6 +131,30 @@ class WorkbenchViewModel @Inject constructor(
     fun updateInputEvidence1(v: String) = _uiState.update { it.copy(inputEvidence1 = v) }
     fun updateSelectedLength(v: LengthProfile) = _uiState.update { it.copy(selectedLength = v) }
     fun updateAiOutput(v: String) = _uiState.update { it.copy(aiOutput = v) }
+
+    // ====================
+    // ★ピッカーからの選択適用
+    // ====================
+    fun applySelectedPersona(persona: Persona, asWriter: Boolean) {
+        if (asWriter) {
+            _uiState.update { it.copy(inputWriter = persona.name) }
+        } else {
+            _uiState.update {
+                it.copy(
+                    inputTargetPersonaName = persona.name,
+                    inputTargetPersonaBio = persona.bio
+                )
+            }
+        }
+    }
+
+    fun applySelectedTopic(topic: Topic) {
+        _uiState.update { it.copy(inputTopic = topic.title) }
+    }
+
+    fun applySelectedWork(work: Work) {
+        _uiState.update { it.copy(inputSourceText = work.bodyText) }
+    }
 
     // ====================
     // 入力検証
