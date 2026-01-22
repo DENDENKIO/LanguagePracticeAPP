@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.languagepracticev3.viewmodel.SettingsViewModel
@@ -23,7 +24,8 @@ import java.time.format.DateTimeFormatter
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    viewModel: SettingsViewModel = hiltViewModel()
+    viewModel: SettingsViewModel = hiltViewModel(),
+    onNavigateToLibrary: () -> Unit = {}  // ★追加: ライブラリへのナビゲーション
 ) {
     val writerName by viewModel.writerName.collectAsState()
     val readerNote by viewModel.readerNote.collectAsState()
@@ -91,7 +93,8 @@ fun SettingsScreen(
                 ) {
                     Text(
                         "基本設定",
-                        style = MaterialTheme.typography.titleMedium
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
                     )
 
                     OutlinedTextField(
@@ -123,7 +126,8 @@ fun SettingsScreen(
                 ) {
                     Text(
                         "AI設定",
-                        style = MaterialTheme.typography.titleMedium
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
                     )
 
                     // AIサイト選択ドロップダウン
@@ -141,7 +145,7 @@ fun SettingsScreen(
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .menuAnchor()
+                                .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
                         )
 
                         ExposedDropdownMenu(
@@ -229,7 +233,7 @@ fun SettingsScreen(
                 }
             }
 
-            // データ管理カード
+            // ★データ管理カード（拡充）
             Card(
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -239,7 +243,8 @@ fun SettingsScreen(
                 ) {
                     Text(
                         "データ管理",
-                        style = MaterialTheme.typography.titleMedium
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
                     )
 
                     // データベース情報
@@ -257,6 +262,24 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
+
+                    HorizontalDivider()
+
+                    // ★保存データ閲覧・編集ボタン（参考ソフトのLibrary相当）
+                    Button(
+                        onClick = onNavigateToLibrary,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Folder, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("保存データを閲覧・編集")
+                    }
+
+                    Text(
+                        "※保存した作品、ペルソナ、トピック等の検索・編集・削除ができます",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
 
                     HorizontalDivider()
 
@@ -288,6 +311,20 @@ fun SettingsScreen(
                         Text("バックアップから復元")
                     }
 
+                    // ★全データ削除ボタン（参考ソフト相当）
+                    OutlinedButton(
+                        onClick = { showClearDataDialog = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isProcessing,
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Icon(Icons.Default.DeleteForever, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("全データを削除")
+                    }
+
                     // 処理中インジケーター
                     if (isProcessing) {
                         Row(
@@ -317,8 +354,55 @@ fun SettingsScreen(
                 onClick = viewModel::saveSettings,
                 modifier = Modifier.fillMaxWidth()
             ) {
+                Icon(Icons.Default.Save, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
                 Text("設定を保存")
             }
         }
+    }
+
+    // ★全データ削除確認ダイアログ
+    if (showClearDataDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearDataDialog = false },
+            icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("全データ削除") },
+            text = {
+                Column {
+                    Text("以下のデータがすべて削除されます：")
+                    Spacer(Modifier.height(8.dp))
+                    Text("• 作品 (Works)")
+                    Text("• 学習カード (StudyCards)")
+                    Text("• ペルソナ (Personas)")
+                    Text("• トピック (Topics)")
+                    Text("• 観察記録 (Observations)")
+                    Text("• 実行ログ (RunLogs)")
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "この操作は元に戻せません。",
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.clearAllData()
+                        showClearDataDialog = false
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("削除する")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearDataDialog = false }) {
+                    Text("キャンセル")
+                }
+            }
+        )
     }
 }

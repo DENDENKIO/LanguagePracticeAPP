@@ -209,6 +209,74 @@ class SettingsViewModel @Inject constructor(
         return context.getDatabasePath("language_practice_db").absolutePath
     }
 
+    // app/src/main/java/com/example/languagepracticev3/viewmodel/SettingsViewModel.kt
+// 以下を追加
+
+    // ========== データ統計 ==========
+
+    private val _dataStats = MutableStateFlow<DataStats?>(null)
+    val dataStats: StateFlow<DataStats?> = _dataStats.asStateFlow()
+
+    data class DataStats(
+        val workCount: Int,
+        val studyCardCount: Int,
+        val personaCount: Int,
+        val topicCount: Int,
+        val observationCount: Int,
+        val runLogCount: Int
+    )
+
+    fun loadDataStats() {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                val dbPath = context.getDatabasePath("language_practice_db")
+                if (dbPath.exists()) {
+                    try {
+                        // 各テーブルの件数を取得（DAOから取得）
+                        // 注: 実際の実装ではDAOを注入するか、直接SQLiteを操作
+                        _dataStats.value = DataStats(
+                            workCount = 0,  // workDao.getCount()
+                            studyCardCount = 0,
+                            personaCount = 0,
+                            topicCount = 0,
+                            observationCount = 0,
+                            runLogCount = 0
+                        )
+                    } catch (e: Exception) {
+                        _statusMessage.value = "統計取得エラー: ${e.message}"
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * 全データ削除
+     */
+    fun clearAllData() {
+        viewModelScope.launch {
+            _isProcessing.value = true
+            try {
+                withContext(Dispatchers.IO) {
+                    val dbFile = context.getDatabasePath("language_practice_db")
+                    // WALファイルも削除
+                    val walFile = File(dbFile.path + "-wal")
+                    val shmFile = File(dbFile.path + "-shm")
+
+                    dbFile.delete()
+                    walFile.delete()
+                    shmFile.delete()
+                }
+                _statusMessage.value = "全データを削除しました。アプリを再起動してください。"
+            } catch (e: Exception) {
+                _statusMessage.value = "削除失敗: ${e.message}"
+            } finally {
+                _isProcessing.value = false
+            }
+        }
+    }
+
+
     /**
      * データベースサイズを取得
      */

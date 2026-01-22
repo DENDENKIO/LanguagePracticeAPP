@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -17,11 +18,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.languagepracticev3.data.model.*
+import com.example.languagepracticev3.viewmodel.LibraryTab
 import com.example.languagepracticev3.viewmodel.LibraryViewModel
 import kotlinx.coroutines.launch
 
@@ -32,8 +37,9 @@ fun LibraryScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val clipboardManager = LocalClipboardManager.current
 
-    // 既存ViewModelのStateFlowを収集
+    // ViewModelのStateFlowを収集
     val searchQuery by viewModel.searchQuery.collectAsState()
     val works by viewModel.searchResults.collectAsState()
     val studyCards by viewModel.studyCards.collectAsState()
@@ -48,11 +54,18 @@ fun LibraryScreen(
     var showSearchBar by remember { mutableStateOf(false) }
     var localSearchQuery by remember { mutableStateOf("") }
 
-    // 編集ダイアログ用
+    // ★編集ダイアログ用（全タイプ対応）
+    var showWorkEditDialog by remember { mutableStateOf(false) }
+    var showStudyCardEditDialog by remember { mutableStateOf(false) }
     var showPersonaEditDialog by remember { mutableStateOf(false) }
     var showTopicEditDialog by remember { mutableStateOf(false) }
+    var showObservationEditDialog by remember { mutableStateOf(false) }
+
+    var editingWork by remember { mutableStateOf<Work?>(null) }
+    var editingStudyCard by remember { mutableStateOf<StudyCard?>(null) }
     var editingPersona by remember { mutableStateOf<Persona?>(null) }
     var editingTopic by remember { mutableStateOf<Topic?>(null) }
+    var editingObservation by remember { mutableStateOf<Observation?>(null) }
 
     // 詳細表示ダイアログ
     var showDetailDialog by remember { mutableStateOf(false) }
@@ -153,9 +166,17 @@ fun LibraryScreen(
                             detailContent = buildWorkDetail(work)
                             showDetailDialog = true
                         },
+                        onEditClick = { work ->
+                            editingWork = work
+                            showWorkEditDialog = true
+                        },
                         onDeleteClick = { work ->
                             deleteTarget = work
                             showDeleteDialog = true
+                        },
+                        onCopyClick = { work ->
+                            clipboardManager.setText(AnnotatedString(work.bodyText ?: ""))
+                            Toast.makeText(context, "本文をコピーしました", Toast.LENGTH_SHORT).show()
                         }
                     )
                     1 -> StudyCardsList(
@@ -164,6 +185,10 @@ fun LibraryScreen(
                             detailTitle = "StudyCard #${card.id}"
                             detailContent = buildStudyCardDetail(card)
                             showDetailDialog = true
+                        },
+                        onEditClick = { card ->
+                            editingStudyCard = card
+                            showStudyCardEditDialog = true
                         },
                         onDeleteClick = { card ->
                             deleteTarget = card
@@ -209,6 +234,10 @@ fun LibraryScreen(
                             detailContent = buildObservationDetail(obs)
                             showDetailDialog = true
                         },
+                        onEditClick = { obs ->
+                            editingObservation = obs
+                            showObservationEditDialog = true
+                        },
                         onDeleteClick = { obs ->
                             deleteTarget = obs
                             showDeleteDialog = true
@@ -217,6 +246,40 @@ fun LibraryScreen(
                 }
             }
         }
+    }
+
+    // ★Work編集ダイアログ
+    if (showWorkEditDialog && editingWork != null) {
+        WorkEditDialog(
+            work = editingWork!!,
+            onDismiss = {
+                showWorkEditDialog = false
+                editingWork = null
+            },
+            onSave = { updated ->
+                viewModel.updateWork(updated)
+                showWorkEditDialog = false
+                editingWork = null
+                Toast.makeText(context, "作品を更新しました", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    // ★StudyCard編集ダイアログ
+    if (showStudyCardEditDialog && editingStudyCard != null) {
+        StudyCardEditDialog(
+            card = editingStudyCard!!,
+            onDismiss = {
+                showStudyCardEditDialog = false
+                editingStudyCard = null
+            },
+            onSave = { updated ->
+                viewModel.updateStudyCard(updated)
+                showStudyCardEditDialog = false
+                editingStudyCard = null
+                Toast.makeText(context, "学習カードを更新しました", Toast.LENGTH_SHORT).show()
+            }
+        )
     }
 
     // Persona編集ダイアログ
@@ -253,24 +316,55 @@ fun LibraryScreen(
         )
     }
 
+    // ★Observation編集ダイアログ
+    if (showObservationEditDialog && editingObservation != null) {
+        ObservationEditDialog(
+            observation = editingObservation!!,
+            onDismiss = {
+                showObservationEditDialog = false
+                editingObservation = null
+            },
+            onSave = { updated ->
+                viewModel.updateObservation(updated)
+                showObservationEditDialog = false
+                editingObservation = null
+                Toast.makeText(context, "観察記録を更新しました", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
     // 詳細表示ダイアログ
     if (showDetailDialog) {
         DetailDialog(
             title = detailTitle,
             content = detailContent,
-            onDismiss = { showDetailDialog = false }
+            onDismiss = { showDetailDialog = false },
+            onCopy = {
+                clipboardManager.setText(AnnotatedString(detailContent))
+                Toast.makeText(context, "内容をコピーしました", Toast.LENGTH_SHORT).show()
+            }
         )
     }
 
     // 削除確認ダイアログ
     if (showDeleteDialog && deleteTarget != null) {
+        val targetName = when (val t = deleteTarget) {
+            is Work -> "作品「${t.title ?: "(無題)"}」"
+            is StudyCard -> "学習カード #${t.id}"
+            is Persona -> "ペルソナ「${t.name}」"
+            is Topic -> "トピック「${t.title}」"
+            is Observation -> "観察記録「${t.motif}」"
+            else -> "この項目"
+        }
+
         AlertDialog(
             onDismissRequest = {
                 showDeleteDialog = false
                 deleteTarget = null
             },
+            icon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
             title = { Text("削除確認") },
-            text = { Text("この項目を削除しますか？\nこの操作は元に戻せません。") },
+            text = { Text("${targetName}を削除しますか？\nこの操作は元に戻せません。") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -299,7 +393,7 @@ fun LibraryScreen(
 }
 
 // ==========================================
-// リストコンポーネント
+// リストコンポーネント（編集ボタン追加）
 // ==========================================
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -307,7 +401,9 @@ fun LibraryScreen(
 private fun WorksList(
     works: List<Work>,
     onItemClick: (Work) -> Unit,
-    onDeleteClick: (Work) -> Unit
+    onEditClick: (Work) -> Unit,
+    onDeleteClick: (Work) -> Unit,
+    onCopyClick: (Work) -> Unit
 ) {
     if (works.isEmpty()) {
         EmptyState("作品がありません")
@@ -326,36 +422,48 @@ private fun WorksList(
                             onLongClick = { onDeleteClick(work) }
                         )
                 ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text(
-                            text = work.title?.ifBlank { "(無題)" } ?: "(無題)",
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = (work.bodyText ?: "").take(100),
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Row {
-                            AssistChip(
-                                onClick = {},
-                                label = { Text(work.kind.ifBlank { "UNKNOWN" }) },
-                                modifier = Modifier.height(24.dp)
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = work.title?.ifBlank { "(無題)" } ?: "(無題)",
+                                style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
-                            val writerName = work.writerName
-                            if (!writerName.isNullOrBlank()) {
-                                Spacer(Modifier.width(4.dp))
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = (work.bodyText ?: "").take(100),
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                 AssistChip(
                                     onClick = {},
-                                    label = { Text(writerName) },
+                                    label = { Text(work.kind.ifBlank { "UNKNOWN" }) },
                                     modifier = Modifier.height(24.dp)
                                 )
+                                val writerName = work.writerName
+                                if (!writerName.isNullOrBlank()) {
+                                    AssistChip(
+                                        onClick = {},
+                                        label = { Text(writerName) },
+                                        modifier = Modifier.height(24.dp)
+                                    )
+                                }
+                            }
+                        }
+                        Column {
+                            IconButton(onClick = { onEditClick(work) }) {
+                                Icon(Icons.Default.Edit, "編集", modifier = Modifier.size(20.dp))
+                            }
+                            IconButton(onClick = { onCopyClick(work) }) {
+                                Icon(Icons.Default.ContentCopy, "コピー", modifier = Modifier.size(20.dp))
                             }
                         }
                     }
@@ -370,6 +478,7 @@ private fun WorksList(
 private fun StudyCardsList(
     cards: List<StudyCard>,
     onItemClick: (StudyCard) -> Unit,
+    onEditClick: (StudyCard) -> Unit,
     onDeleteClick: (StudyCard) -> Unit
 ) {
     if (cards.isEmpty()) {
@@ -389,17 +498,25 @@ private fun StudyCardsList(
                             onLongClick = { onDeleteClick(card) }
                         )
                 ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text(
-                            text = "Focus: ${card.focus ?: "(未設定)"}",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = "Level: ${card.level ?: "-"} | Tags: ${card.tags ?: "-"}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Focus: ${card.focus ?: "(未設定)"}",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = "Level: ${card.level ?: "-"} | Tags: ${card.tags ?: "-"}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        IconButton(onClick = { onEditClick(card) }) {
+                            Icon(Icons.Default.Edit, "編集")
+                        }
                     }
                 }
             }
@@ -538,6 +655,7 @@ private fun TopicsList(
 private fun ObservationsList(
     observations: List<Observation>,
     onItemClick: (Observation) -> Unit,
+    onEditClick: (Observation) -> Unit,
     onDeleteClick: (Observation) -> Unit
 ) {
     if (observations.isEmpty()) {
@@ -557,19 +675,27 @@ private fun ObservationsList(
                             onLongClick = { onDeleteClick(obs) }
                         )
                 ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text(
-                            text = obs.motif,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = obs.fullContent.take(100),
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = obs.motif,
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = obs.fullContent.take(100),
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        IconButton(onClick = { onEditClick(obs) }) {
+                            Icon(Icons.Default.Edit, "編集")
+                        }
                     }
                 }
             }
@@ -583,17 +709,228 @@ private fun EmptyState(message: String) {
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                Icons.Default.Inbox,
+                contentDescription = null,
+                modifier = Modifier.size(48.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
 // ==========================================
 // 編集ダイアログ
 // ==========================================
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WorkEditDialog(
+    work: Work,
+    onDismiss: () -> Unit,
+    onSave: (Work) -> Unit
+) {
+    var title by remember { mutableStateOf(work.title ?: "") }
+    var bodyText by remember { mutableStateOf(work.bodyText ?: "") }
+    var writerName by remember { mutableStateOf(work.writerName ?: "") }
+    var readerNote by remember { mutableStateOf(work.readerNote ?: "") }
+    var toneLabel by remember { mutableStateOf(work.toneLabel ?: "") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("作品を編集") },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 500.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("タイトル") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = writerName,
+                    onValueChange = { writerName = it },
+                    label = { Text("書き手") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = readerNote,
+                    onValueChange = { readerNote = it },
+                    label = { Text("読者ノート") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = toneLabel,
+                    onValueChange = { toneLabel = it },
+                    label = { Text("トーン") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = bodyText,
+                    onValueChange = { bodyText = it },
+                    label = { Text("本文") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    maxLines = 20
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                onSave(work.copy(
+                    title = title.ifBlank { null },
+                    bodyText = bodyText.ifBlank { null },
+                    writerName = writerName.ifBlank { null },
+                    readerNote = readerNote.ifBlank { null },
+                    toneLabel = toneLabel.ifBlank { null }
+                ))
+            }) {
+                Text("保存")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("キャンセル")
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun StudyCardEditDialog(
+    card: StudyCard,
+    onDismiss: () -> Unit,
+    onSave: (StudyCard) -> Unit
+) {
+    var focus by remember { mutableStateOf(card.focus ?: "") }
+    var level by remember { mutableStateOf(card.level ?: "NORMAL") }
+    var bestExpressions by remember { mutableStateOf(card.bestExpressionsRaw ?: "") }
+    var metaphorChains by remember { mutableStateOf(card.metaphorChainsRaw ?: "") }
+    var doNext by remember { mutableStateOf(card.doNextRaw ?: "") }
+    var tags by remember { mutableStateOf(card.tags ?: "") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("学習カードを編集") },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 500.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = focus,
+                    onValueChange = { focus = it },
+                    label = { Text("Focus") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                // Level選択
+                var expanded by remember { mutableStateOf(false) }
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = it }
+                ) {
+                    OutlinedTextField(
+                        value = level,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Level") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        listOf("NORMAL", "INTERMEDIATE", "ADVANCED").forEach { l ->
+                            DropdownMenuItem(
+                                text = { Text(l) },
+                                onClick = {
+                                    level = l
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = tags,
+                    onValueChange = { tags = it },
+                    label = { Text("タグ（カンマ区切り）") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = bestExpressions,
+                    onValueChange = { bestExpressions = it },
+                    label = { Text("Best Expressions") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    maxLines = 5
+                )
+                OutlinedTextField(
+                    value = metaphorChains,
+                    onValueChange = { metaphorChains = it },
+                    label = { Text("Metaphor Chains") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    maxLines = 5
+                )
+                OutlinedTextField(
+                    value = doNext,
+                    onValueChange = { doNext = it },
+                    label = { Text("Do Next") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    maxLines = 5
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                onSave(card.copy(
+                    focus = focus.ifBlank { null },
+                    level = level.ifBlank { null },
+                    bestExpressionsRaw = bestExpressions.ifBlank { null },
+                    metaphorChainsRaw = metaphorChains.ifBlank { null },
+                    doNextRaw = doNext.ifBlank { null },
+                    tags = tags.ifBlank { null }
+                ))
+            }) {
+                Text("保存")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("キャンセル")
+            }
+        }
+    )
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -611,10 +948,13 @@ private fun PersonaEditDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("ペルソナ編集") },
+        title = { Text("ペルソナを編集") },
         text = {
             Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 500.dp)
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 OutlinedTextField(
@@ -666,7 +1006,6 @@ private fun PersonaEditDialog(
                         readOnly = true,
                         label = { Text("検証ステータス") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                        // ★修正: menuAnchor() → menuAnchor(MenuAnchorType.PrimaryNotEditable)
                         modifier = Modifier
                             .fillMaxWidth()
                             .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
@@ -725,10 +1064,13 @@ private fun TopicEditDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("トピック編集") },
+        title = { Text("トピックを編集") },
         text = {
             Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 500.dp)
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 OutlinedTextField(
@@ -757,7 +1099,6 @@ private fun TopicEditDialog(
                         readOnly = true,
                         label = { Text("シーン") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                        // ★修正: menuAnchor() → menuAnchor(MenuAnchorType.PrimaryNotEditable)
                         modifier = Modifier
                             .fillMaxWidth()
                             .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
@@ -815,23 +1156,137 @@ private fun TopicEditDialog(
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DetailDialog(
-    title: String,
-    content: String,
-    onDismiss: () -> Unit
+private fun ObservationEditDialog(
+    observation: Observation,
+    onDismiss: () -> Unit,
+    onSave: (Observation) -> Unit
 ) {
+    var motif by remember { mutableStateOf(observation.motif) }
+    var imageUrl by remember { mutableStateOf(observation.imageUrl) }
+    var visualRaw by remember { mutableStateOf(observation.visualRaw) }
+    var soundRaw by remember { mutableStateOf(observation.soundRaw) }
+    var metaphorsRaw by remember { mutableStateOf(observation.metaphorsRaw) }
+    var coreCandidatesRaw by remember { mutableStateOf(observation.coreCandidatesRaw) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        title = { Text("観察記録を編集") },
         text = {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 400.dp)
-                    .verticalScroll(rememberScrollState())
+                    .heightIn(max = 500.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(content, style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(
+                    value = motif,
+                    onValueChange = { motif = it },
+                    label = { Text("モチーフ") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = imageUrl,
+                    onValueChange = { imageUrl = it },
+                    label = { Text("画像URL") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = visualRaw,
+                    onValueChange = { visualRaw = it },
+                    label = { Text("Visual（視覚）") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    maxLines = 4
+                )
+                OutlinedTextField(
+                    value = soundRaw,
+                    onValueChange = { soundRaw = it },
+                    label = { Text("Sound（音）") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    maxLines = 4
+                )
+                OutlinedTextField(
+                    value = metaphorsRaw,
+                    onValueChange = { metaphorsRaw = it },
+                    label = { Text("Metaphors（比喩）") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    maxLines = 4
+                )
+                OutlinedTextField(
+                    value = coreCandidatesRaw,
+                    onValueChange = { coreCandidatesRaw = it },
+                    label = { Text("Core Candidates（核候補）") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    maxLines = 4
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                onSave(observation.copy(
+                    motif = motif,
+                    imageUrl = imageUrl,
+                    visualRaw = visualRaw,
+                    soundRaw = soundRaw,
+                    metaphorsRaw = metaphorsRaw,
+                    coreCandidatesRaw = coreCandidatesRaw
+                ))
+            }) {
+                Text("保存")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("キャンセル")
+            }
+        }
+    )
+}
+
+@Composable
+private fun DetailDialog(
+    title: String,
+    content: String,
+    onDismiss: () -> Unit,
+    onCopy: () -> Unit = {}
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    title,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = onCopy) {
+                    Icon(Icons.Default.ContentCopy, "コピー")
+                }
+            }
+        },
+        text = {
+            SelectionContainer {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 400.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Text(content, style = MaterialTheme.typography.bodySmall)
+                }
             }
         },
         confirmButton = {

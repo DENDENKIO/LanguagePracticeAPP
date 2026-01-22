@@ -92,7 +92,12 @@ fun MainScreen(
             color = MaterialTheme.colorScheme.background
         ) {
             when (currentScreen) {
-                Screen.SETTINGS -> SettingsScreen()
+                // ★ここを修正: SettingsScreenにonNavigateToLibraryを渡す
+                Screen.SETTINGS -> SettingsScreen(
+                    onNavigateToLibrary = {
+                        viewModel.navigateTo(Screen.LIBRARY)
+                    }
+                )
                 Screen.WORKBENCH -> WorkbenchScreen()
                 Screen.ROUTES -> RoutesScreen()
                 Screen.PRACTICE -> PracticeScreen()

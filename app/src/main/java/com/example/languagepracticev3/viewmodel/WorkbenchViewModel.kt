@@ -316,7 +316,7 @@ class WorkbenchViewModel @Inject constructor(
 
     private suspend fun saveTextGenResult(output: String, runLogId: Long, now: String): SaveResult {
         val parsed = outputParser.parseTextGenOutput(output)
-            ?: return SaveResult.Error("テキスト生成結果の解析に失敗しました")
+            ?: return SaveResult.Error("テキスト生成結果の解析に失敗しました。\n出力形式を確認してください。")
 
         val work = Work(
             kind = "TEXT_GEN",
@@ -324,12 +324,13 @@ class WorkbenchViewModel @Inject constructor(
             bodyText = parsed.bodyText,
             createdAt = now,
             runLogId = runLogId,
-            writerName = _uiState.value.inputWriter,
-            readerNote = _uiState.value.inputReader,
-            toneLabel = null
+            // パース結果を優先、なければ入力値を使用
+            writerName = parsed.writerName.ifBlank { _uiState.value.inputWriter },
+            readerNote = parsed.readerNote.ifBlank { _uiState.value.inputReader },
+            toneLabel = parsed.toneLabel.takeIf { it != "なし" }
         )
         workDao.insert(work)
-        return SaveResult.Success(1, "作品を保存しました")
+        return SaveResult.Success(1, "作品を保存しました: ${parsed.title}")
     }
 
     private suspend fun saveStudyCardResult(output: String, runLogId: Long, now: String): SaveResult {
@@ -345,10 +346,10 @@ class WorkbenchViewModel @Inject constructor(
             metaphorChainsRaw = parsed.metaphorChains,
             doNextRaw = parsed.doNext,
             tags = parsed.tags,
-            fullParsedContent = output
+            fullParsedContent = parsed.fullParsedContent.ifBlank { output }
         )
         studyCardDao.insert(card)
-        return SaveResult.Success(1, "学習カードを保存しました")
+        return SaveResult.Success(1, "学習カードを保存しました: ${parsed.focus.take(30)}...")
     }
 
     private suspend fun savePersonaGenResult(output: String, now: String): SaveResult {
