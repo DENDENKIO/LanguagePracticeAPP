@@ -5,20 +5,11 @@ import androidx.lifecycle.viewModelScope
 import com.example.languagepracticev3.data.database.*
 import com.example.languagepracticev3.data.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-
-data class LibraryUiState(
-    val works: List<Work> = emptyList(),
-    val studyCards: List<StudyCard> = emptyList(),
-    val personas: List<Persona> = emptyList(),
-    val topics: List<Topic> = emptyList(),
-    val observations: List<Observation> = emptyList(),
-    val searchKeyword: String = "",
-    val selectedTab: LibraryTab = LibraryTab.WORKS,
-    val isLoading: Boolean = false
-)
 
 enum class LibraryTab {
     WORKS,
@@ -28,6 +19,7 @@ enum class LibraryTab {
     OBSERVATIONS
 }
 
+@OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
     private val workDao: WorkDao,
@@ -37,92 +29,104 @@ class LibraryViewModel @Inject constructor(
     private val observationDao: ObservationDao
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(LibraryUiState())
-    val uiState: StateFlow<LibraryUiState> = _uiState.asStateFlow()
+    // 検索クエリ
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    private val _searchKeyword = MutableStateFlow("")
+    // 選択中の作品
+    private val _selectedWork = MutableStateFlow<Work?>(null)
+    val selectedWork: StateFlow<Work?> = _selectedWork.asStateFlow()
 
-    init {
-        loadAllData()
+    // 選択中のタブ
+    private val _selectedTab = MutableStateFlow(LibraryTab.WORKS)
+    val selectedTab: StateFlow<LibraryTab> = _selectedTab.asStateFlow()
 
-        // 検索キーワードの変更を監視
-        viewModelScope.launch {
-            _searchKeyword
-                .debounce(300)
-                .collectLatest { keyword ->
-                    if (keyword.isBlank()) {
-                        loadAllData()
-                    } else {
-                        searchData(keyword)
-                    }
-                }
+    // ローディング状態
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    // 検索結果（Works）
+    val searchResults: StateFlow<List<Work>> = _searchQuery
+        .debounce(300)
+        .flatMapLatest { query ->
+            if (query.isBlank()) {
+                workDao.observeAll()
+            } else {
+                workDao.search(query)
+            }
         }
-    }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private fun loadAllData() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
+    // StudyCards
+    val studyCards: StateFlow<List<StudyCard>> = _searchQuery
+        .debounce(300)
+        .flatMapLatest { query ->
+            if (query.isBlank()) {
+                studyCardDao.observeAll()
+            } else {
+                studyCardDao.search(query)
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-            combine(
-                workDao.observeAll(),
-                studyCardDao.observeAll(),
-                personaDao.observeAll(),
-                topicDao.observeAll(),
+    // Personas
+    val personas: StateFlow<List<Persona>> = _searchQuery
+        .debounce(300)
+        .flatMapLatest { query ->
+            if (query.isBlank()) {
+                personaDao.observeAll()
+            } else {
+                personaDao.search(query)
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Topics
+    val topics: StateFlow<List<Topic>> = _searchQuery
+        .debounce(300)
+        .flatMapLatest { query ->
+            if (query.isBlank()) {
+                topicDao.observeAll()
+            } else {
+                topicDao.search(query)
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Observations
+    val observations: StateFlow<List<Observation>> = _searchQuery
+        .debounce(300)
+        .flatMapLatest { query ->
+            if (query.isBlank()) {
                 observationDao.observeAll()
-            ) { works, studyCards, personas, topics, observations ->
-                LibraryUiState(
-                    works = works,
-                    studyCards = studyCards,
-                    personas = personas,
-                    topics = topics,
-                    observations = observations,
-                    searchKeyword = _searchKeyword.value,
-                    selectedTab = _uiState.value.selectedTab,
-                    isLoading = false
-                )
-            }.collect { state ->
-                _uiState.value = state
+            } else {
+                observationDao.search(query)
             }
         }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // 検索クエリ更新
+    fun updateSearchQuery(query: String) {
+        _searchQuery.value = query
     }
 
-    private fun searchData(keyword: String) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
-
-            combine(
-                workDao.search(keyword),
-                studyCardDao.search(keyword),
-                personaDao.search(keyword),
-                topicDao.search(keyword),
-                observationDao.search(keyword)
-            ) { works, studyCards, personas, topics, observations ->
-                _uiState.value.copy(
-                    works = works,
-                    studyCards = studyCards,
-                    personas = personas,
-                    topics = topics,
-                    observations = observations,
-                    isLoading = false
-                )
-            }.collect { state ->
-                _uiState.value = state
-            }
-        }
+    // 作品選択
+    fun selectWork(work: Work?) {
+        _selectedWork.value = work
     }
 
-    fun updateSearchKeyword(keyword: String) {
-        _searchKeyword.value = keyword
-        _uiState.update { it.copy(searchKeyword = keyword) }
-    }
-
+    // タブ選択
     fun selectTab(tab: LibraryTab) {
-        _uiState.update { it.copy(selectedTab = tab) }
+        _selectedTab.value = tab
     }
 
+    // 削除メソッド
     fun deleteWork(work: Work) {
         viewModelScope.launch {
             workDao.delete(work)
+            if (_selectedWork.value?.id == work.id) {
+                _selectedWork.value = null
+            }
         }
     }
 
@@ -151,10 +155,9 @@ class LibraryViewModel @Inject constructor(
     }
 
     fun refresh() {
-        if (_searchKeyword.value.isBlank()) {
-            loadAllData()
-        } else {
-            searchData(_searchKeyword.value)
-        }
+        // 検索クエリを再発行してリフレッシュ
+        val current = _searchQuery.value
+        _searchQuery.value = ""
+        _searchQuery.value = current
     }
 }
