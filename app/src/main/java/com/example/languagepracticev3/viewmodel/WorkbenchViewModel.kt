@@ -151,7 +151,7 @@ class WorkbenchViewModel @Inject constructor(
     }
 
     // ====================
-    // プロンプト生成
+    // プロンプト生成（★修正箇所）
     // ====================
     fun generatePrompt() {
         val state = _uiState.value
@@ -159,12 +159,12 @@ class WorkbenchViewModel @Inject constructor(
             OperationKind.TEXT_GEN -> promptBuilder.buildTextGenPrompt(
                 writer = state.inputWriter,
                 topic = state.inputTopic,
-                coreReader = state.inputReader,
+                reader = state.inputReader,  // ★修正: coreReader → reader
                 tone = "",
                 length = state.selectedLength
             )
             OperationKind.STUDY_CARD -> promptBuilder.buildStudyCardPrompt(
-                coreReader = state.inputReader,
+                reader = state.inputReader,  // ★修正: coreReader → reader
                 tone = "",
                 sourceText = state.inputSourceText
             )
@@ -172,13 +172,13 @@ class WorkbenchViewModel @Inject constructor(
             OperationKind.TOPIC_GEN -> promptBuilder.buildTopicGenPrompt(state.inputImageUrl)
             OperationKind.OBSERVE_IMAGE -> promptBuilder.buildObserveImagePrompt(state.inputImageUrl)
             OperationKind.CORE_EXTRACT -> promptBuilder.buildCoreExtractPrompt(
-                coreReader = state.inputReader,
+                reader = state.inputReader,  // ★修正: coreReader → reader
                 sourceText = state.inputSourceText
             )
             OperationKind.GIKO -> promptBuilder.buildGikoPrompt(
                 toneLabel = state.inputToneLabel,
                 toneRule = state.inputToneRule,
-                coreReader = state.inputReader,
+                reader = state.inputReader,  // ★修正: coreReader → reader
                 topic = state.inputTopic,
                 sourceText = state.inputSourceText
             )
@@ -187,7 +187,7 @@ class WorkbenchViewModel @Inject constructor(
                 coreTheme = state.inputCoreTheme,
                 coreEmotion = state.inputCoreEmotion,
                 coreTakeaway = state.inputCoreTakeaway,
-                coreReader = state.inputReader,
+                coreReader = state.inputReader,  // これは正しい（PromptBuilderの引数名がcoreReader）
                 coreSentence = state.inputCoreSentence
             )
             OperationKind.PERSONA_VERIFY_ASSIST -> promptBuilder.buildPersonaVerifyPrompt(

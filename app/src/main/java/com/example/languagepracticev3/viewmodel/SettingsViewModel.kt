@@ -40,8 +40,8 @@ class SettingsViewModel @Inject constructor(
     private val _statusMessage = MutableStateFlow("")
     val statusMessage: StateFlow<String> = _statusMessage.asStateFlow()
 
-    // AIサイト一覧
-    val aiSitePresets = AiSiteCatalog.presets
+    // ★修正: presets → Presets
+    val aiSitePresets: List<AiSiteProfile> = AiSiteCatalog.Presets
 
     // 現在選択中のAIサイトプロファイル
     val selectedAiSiteProfile: AiSiteProfile

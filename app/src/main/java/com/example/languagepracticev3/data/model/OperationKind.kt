@@ -3,7 +3,6 @@ package com.example.languagepracticev3.data.model
 
 /**
  * 操作種別 Enum
- * WPF版 Helpers/Constants.cs の OperationKind をKotlinに移植
  */
 enum class OperationKind(val displayName: String) {
     READER_AUTO_GEN("読者像自動生成"),
@@ -19,7 +18,11 @@ enum class OperationKind(val displayName: String) {
     PRACTICE_SESSION("練習セッション"),
     // MindsetLab用
     MS_PLAN_GEN("MS計画生成"),
-    MS_REVIEW_SCORE("MSレビュースコア");
+    MS_REVIEW_SCORE("MSレビュースコア"),
+    // ★追加: PoetryLab用
+    POETRY_DRAFT("詩作ドラフト"),
+    POETRY_CORE("詩作コア抽出"),
+    POETRY_REV("詩作推敲");
 
     companion object {
         fun fromName(name: String): OperationKind {
