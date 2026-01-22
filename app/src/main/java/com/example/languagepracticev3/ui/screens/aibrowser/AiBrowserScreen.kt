@@ -3,7 +3,6 @@ package com.example.languagepracticev3.ui.screens.aibrowser
 
 import android.annotation.SuppressLint
 import android.view.ViewGroup
-import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -42,15 +41,15 @@ fun AiBrowserScreen(
     var statusMessage by remember { mutableStateOf("読み込み中...") }
     var isLoading by remember { mutableStateOf(true) }
 
-    // ★修正: 注入状態を詳細に管理
+    // ★修正: mutableIntStateOf → mutableStateOf<Int> に変更（互換性のため）
     var injectionState by remember { mutableStateOf(InjectionState.NOT_STARTED) }
     var isMonitoring by remember { mutableStateOf(false) }
-    var lastTextLength by remember { mutableIntStateOf(0) }
-    var stableCount by remember { mutableIntStateOf(0) }
+    var lastTextLength by remember { mutableStateOf(0) }
+    var stableCount by remember { mutableStateOf(0) }
 
     // ★修正: AI応答開始検出用
     var responseStarted by remember { mutableStateOf(false) }
-    var initialPageTextLength by remember { mutableIntStateOf(0) }
+    var initialPageTextLength by remember { mutableStateOf(0) }
 
     val doneSentinel = LpConstants.DONE_SENTINEL
     val promptSentinelCount = remember { countSentinel(prompt, doneSentinel) }
@@ -180,7 +179,7 @@ fun AiBrowserScreen(
                     }
                 },
                 actions = {
-                    // ★修正: 再送信ボタンは失敗時のみ有効
+                    // ★修正: 再送信ボタンは失敗時または未開始時のみ有効
                     IconButton(
                         onClick = {
                             injectionState = InjectionState.NOT_STARTED
