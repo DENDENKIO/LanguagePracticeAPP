@@ -153,7 +153,7 @@ class WorkbenchViewModel @Inject constructor(
     }
 
     fun applySelectedWork(work: Work) {
-        _uiState.update { it.copy(inputSourceText = work.bodyText) }
+        _uiState.update { it.copy(inputSourceText = work.bodyText.orEmpty()) }
     }
 
     // ====================
@@ -354,16 +354,20 @@ class WorkbenchViewModel @Inject constructor(
         val parsed = outputParser.parseTextGenOutput(output)
             ?: return SaveResult.Error("テキスト生成結果の解析に失敗しました。\n出力形式を確認してください。")
 
+        // ★修正: nullable対応
+        val writerName: String? = parsed.writerName.ifBlank { _uiState.value.inputWriter }.takeIf { it.isNotBlank() }
+        val readerNote: String? = parsed.readerNote.ifBlank { _uiState.value.inputReader }.takeIf { it.isNotBlank() }
+        val toneLabel: String? = parsed.toneLabel.takeIf { it.isNotBlank() && it != "なし" }
+
         val work = Work(
             kind = "TEXT_GEN",
             title = parsed.title,
             bodyText = parsed.bodyText,
             createdAt = now,
             runLogId = runLogId,
-            // パース結果を優先、なければ入力値を使用
-            writerName = parsed.writerName.ifBlank { _uiState.value.inputWriter },
-            readerNote = parsed.readerNote.ifBlank { _uiState.value.inputReader },
-            toneLabel = parsed.toneLabel.takeIf { it != "なし" }
+            writerName = writerName,
+            readerNote = readerNote,
+            toneLabel = toneLabel
         )
         workDao.insert(work)
         return SaveResult.Success(1, "作品を保存しました: ${parsed.title}")
