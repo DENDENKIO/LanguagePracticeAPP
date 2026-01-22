@@ -1,16 +1,15 @@
+// app/src/main/java/com/example/languagepracticev3/data/model/LengthProfile.kt
 package com.example.languagepracticev3.data.model
 
-enum class LengthProfile(val displayName: String, val minChars: Int, val maxChars: Int) {
-    // 詳細版の定義
-    MICRO("超短文", 50, 100),
-    STUDY_SHORT("短文", 90, 200),
-    STUDY_MEDIUM("中文", 250, 450),
-    STUDY_LONG("長文", 450, 800),
-    ESSAY("エッセイ", 800, 1500),
+enum class LengthProfile(val displayName: String, val wordRange: String) {
+    STUDY_SHORT("練習用（短め）", "200-400字"),
+    STANDARD("標準", "400-800字"),
+    LONG("長め", "800-1200字"),
+    ESSAY("エッセイ", "1200-2000字");
 
-    // RouteModels用の追加（互換性のため）
-    SHORT("短め", 100, 200),
-    MEDIUM("普通", 200, 400),
-    LONG("長め", 400, 800),
-    VERY_LONG("とても長い", 800, 1500)
+    companion object {
+        fun fromName(name: String): LengthProfile {
+            return entries.find { it.name == name } ?: STUDY_SHORT
+        }
+    }
 }
