@@ -19,13 +19,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.languagepracticev3.data.model.AiSiteProfile
-import com.example.languagepracticev3.data.model.LpConstants  // ← 修正: LpConstantsを直接インポート
+import com.example.languagepracticev3.data.model.LpConstants
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
  * AI WebView 自動送信画面
- * WPF版 BrowserWindow.xaml.cs をKotlin/Composeに移植
+ * ★修正版: 2回送信問題・早すぎる取り込み問題を解消
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,31 +41,30 @@ fun AiBrowserScreen(
     var webView by remember { mutableStateOf<WebView?>(null) }
     var statusMessage by remember { mutableStateOf("読み込み中...") }
     var isLoading by remember { mutableStateOf(true) }
-    var hasInjected by remember { mutableStateOf(false) }
+
+    // ★修正: 注入状態を詳細に管理
+    var injectionState by remember { mutableStateOf(InjectionState.NOT_STARTED) }
     var isMonitoring by remember { mutableStateOf(false) }
     var lastTextLength by remember { mutableIntStateOf(0) }
     var stableCount by remember { mutableIntStateOf(0) }
 
-    // 修正: PromptBuilder.LpConstants → LpConstants
+    // ★修正: AI応答開始検出用
+    var responseStarted by remember { mutableStateOf(false) }
+    var initialPageTextLength by remember { mutableIntStateOf(0) }
+
     val doneSentinel = LpConstants.DONE_SENTINEL
     val promptSentinelCount = remember { countSentinel(prompt, doneSentinel) }
 
-    // JavaScript Interface for receiving results
-    val jsInterface = remember {
-        object {
-            @JavascriptInterface
-            fun onTextReceived(text: String) {
-                // メインスレッドで処理
-            }
-        }
-    }
-
-    // 監視ループ
+    // 監視ループ（★修正: AI応答開始を確認してから安定判定）
     LaunchedEffect(isMonitoring) {
         if (!isMonitoring) return@LaunchedEffect
 
+        // ★修正: 監視開始時に少し待機（AIが応答開始するまで）
+        delay(2000)
+
         while (isMonitoring) {
-            delay(1000)
+            delay(1500) // ★修正: 間隔を長めに
+
             webView?.let { wv ->
                 wv.evaluateJavascript("document.body.innerText") { rawText ->
                     val currentText = rawText
@@ -77,9 +76,21 @@ fun AiBrowserScreen(
                     val totalSentinelCount = countSentinel(currentText, doneSentinel)
                     val requiredCount = promptSentinelCount + 1
 
-                    statusMessage = "監視中: Sentinel=$totalSentinelCount/$requiredCount, 長さ=$currentLength, 安定=$stableCount/5"
+                    // ★修正: AI応答開始の検出
+                    if (!responseStarted) {
+                        // テキスト長が初期より大幅に増えたら応答開始
+                        if (currentLength > initialPageTextLength + 100) {
+                            responseStarted = true
+                            statusMessage = "AI応答検出。生成完了を待機中..."
+                        } else {
+                            statusMessage = "AI応答待機中... (長さ=$currentLength)"
+                            return@evaluateJavascript
+                        }
+                    }
 
-                    // センチネルが必要数に達していない場合は待機
+                    statusMessage = "監視中: Sentinel=$totalSentinelCount/$requiredCount, 長さ=$currentLength, 安定=$stableCount/7"
+
+                    // ★修正: センチネル必要数チェック（応答開始後のみ）
                     if (totalSentinelCount < requiredCount) {
                         stableCount = 0
                         lastTextLength = currentLength
@@ -94,13 +105,13 @@ fun AiBrowserScreen(
                         stableCount++
                     }
 
-                    // 安定したら結果を取得
-                    if (stableCount >= 5) {
+                    // ★修正: 安定判定を厳しく（7回連続で安定）
+                    if (stableCount >= 7) {
                         isMonitoring = false
                         statusMessage = "生成完了！結果を取得中..."
 
                         scope.launch {
-                            delay(2000)
+                            delay(1500) // ★修正: 最終確認の待機
                             wv.evaluateJavascript("document.body.innerText") { finalRaw ->
                                 val fullText = finalRaw
                                     .removeSurrounding("\"")
@@ -117,22 +128,38 @@ fun AiBrowserScreen(
         }
     }
 
-    // プロンプト注入関数
+    // ★修正: プロンプト注入関数（状態管理強化）
     fun injectPrompt() {
+        // ★修正: 既に注入済みまたは処理中なら何もしない
+        if (injectionState != InjectionState.NOT_STARTED &&
+            injectionState != InjectionState.FAILED) {
+            statusMessage = "既に送信済みまたは処理中です"
+            return
+        }
+
         webView?.let { wv ->
+            injectionState = InjectionState.INJECTING
             statusMessage = "自動入力実行中..."
+
             val safePrompt = jsEscape(prompt)
             val script = buildInjectScript(siteProfile.id, safePrompt)
 
             wv.evaluateJavascript(script) { result ->
                 if (result.contains("INPUT_NOT_FOUND")) {
+                    injectionState = InjectionState.FAILED
                     statusMessage = "入力欄が見つかりません。手動で入力してください。"
                 } else {
-                    statusMessage = "入力完了。生成完了を待機中..."
-                    hasInjected = true
-                    lastTextLength = 0
-                    stableCount = 0
-                    isMonitoring = true
+                    injectionState = InjectionState.COMPLETED
+                    statusMessage = "入力完了。AI応答を待機中..."
+
+                    // ★修正: 初期テキスト長を記録してから監視開始
+                    wv.evaluateJavascript("document.body.innerText.length") { lengthStr ->
+                        initialPageTextLength = lengthStr.replace("\"", "").toIntOrNull() ?: 0
+                        lastTextLength = 0
+                        stableCount = 0
+                        responseStarted = false
+                        isMonitoring = true
+                    }
                 }
             }
         }
@@ -153,11 +180,18 @@ fun AiBrowserScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { injectPrompt() }) {
+                    // ★修正: 再送信ボタンは失敗時のみ有効
+                    IconButton(
+                        onClick = {
+                            injectionState = InjectionState.NOT_STARTED
+                            injectPrompt()
+                        },
+                        enabled = injectionState == InjectionState.FAILED ||
+                                injectionState == InjectionState.NOT_STARTED
+                    ) {
                         Icon(Icons.Default.Send, "再送信")
                     }
                     IconButton(onClick = {
-                        // クリップボードから貼り付け
                         val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
                         val clipText = clipboard?.primaryClip?.getItemAt(0)?.text?.toString() ?: ""
                         if (clipText.isNotBlank()) {
@@ -220,11 +254,15 @@ fun AiBrowserScreen(
                             super.onPageFinished(view, url)
                             isLoading = false
 
-                            if (!hasInjected) {
+                            // ★修正: 注入が未開始の場合のみ自動実行
+                            if (injectionState == InjectionState.NOT_STARTED) {
                                 statusMessage = "読み込み完了。3秒後に自動入力..."
                                 scope.launch {
                                     delay(3000)
-                                    injectPrompt()
+                                    // ★修正: 再度状態チェック
+                                    if (injectionState == InjectionState.NOT_STARTED) {
+                                        injectPrompt()
+                                    }
                                 }
                             }
                         }
@@ -239,6 +277,14 @@ fun AiBrowserScreen(
             update = { /* WebViewは初期化時のみ設定 */ }
         )
     }
+}
+
+// ★追加: 注入状態を管理するenum
+private enum class InjectionState {
+    NOT_STARTED,
+    INJECTING,
+    COMPLETED,
+    FAILED
 }
 
 // ==========================================
@@ -267,7 +313,6 @@ private fun jsEscape(s: String): String {
 }
 
 private fun extractAiResponse(fullText: String, promptSentinelCount: Int, sentinel: String): String {
-    // プロンプト内のセンチネルをスキップ
     var pos = 0
     for (i in 0 until promptSentinelCount) {
         pos = fullText.indexOf(sentinel, pos)
@@ -277,11 +322,9 @@ private fun extractAiResponse(fullText: String, promptSentinelCount: Int, sentin
 
     val afterPrompt = if (pos > 0) fullText.substring(pos) else fullText
 
-    // AI出力内のセンチネルを探す
     val aiSentinelPos = afterPrompt.indexOf(sentinel)
     if (aiSentinelPos == -1) return afterPrompt
 
-    // 修正: LpConstants.MarkerBegin.values を正しくイテレート
     val markerValues: Collection<String> = LpConstants.MarkerBegin.values
     var bestMarkerPos = -1
 
@@ -301,7 +344,6 @@ private fun extractAiResponse(fullText: String, promptSentinelCount: Int, sentin
 }
 
 private fun buildInjectScript(siteId: String, safePrompt: String): String {
-    // Perplexity用
     if (siteId == "PERPLEXITY") {
         return """
 (function() {
@@ -357,7 +399,6 @@ private fun buildInjectScript(siteId: String, safePrompt: String): String {
         """.trimIndent()
     }
 
-    // 汎用（Genspark等）
     return """
 (function() {
   function pickInput() {

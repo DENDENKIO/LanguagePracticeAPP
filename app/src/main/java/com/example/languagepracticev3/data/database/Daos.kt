@@ -64,17 +64,31 @@ interface WorkDao {
     @Query("SELECT * FROM work ORDER BY createdAt DESC")
     fun observeAll(): Flow<List<Work>>
 
-    @Query("SELECT * FROM work ORDER BY createdAt DESC")
-    fun getAll(): Flow<List<Work>>
+    // ★追加: suspend版 getAll
+    @Query("SELECT * FROM work ORDER BY id DESC LIMIT 100")
+    suspend fun getAll(): List<Work>
 
     @Query("""
         SELECT * FROM work 
         WHERE title LIKE '%' || :query || '%'
            OR bodyText LIKE '%' || :query || '%'
            OR writerName LIKE '%' || :query || '%'
+           OR toneLabel LIKE '%' || :query || '%'
         ORDER BY createdAt DESC
     """)
     fun search(query: String): Flow<List<Work>>
+
+    // ★追加: suspend版 search
+    @Query("""
+        SELECT * FROM work 
+        WHERE title LIKE :query 
+           OR bodyText LIKE :query 
+           OR writerName LIKE :query 
+           OR toneLabel LIKE :query
+           OR readerNote LIKE :query
+        ORDER BY id DESC LIMIT 100
+    """)
+    suspend fun searchSuspend(query: String): List<Work>
 
     @Query("SELECT * FROM work WHERE kind = :kind ORDER BY createdAt DESC")
     fun filterByKind(kind: String): Flow<List<Work>>
@@ -101,8 +115,9 @@ interface StudyCardDao {
     @Query("SELECT * FROM study_card ORDER BY createdAt DESC")
     fun observeAll(): Flow<List<StudyCard>>
 
-    @Query("SELECT * FROM study_card ORDER BY createdAt DESC")
-    fun getAll(): Flow<List<StudyCard>>
+    // ★追加: suspend版 getAll
+    @Query("SELECT * FROM study_card ORDER BY id DESC LIMIT 100")
+    suspend fun getAll(): List<StudyCard>
 
     @Query("""
         SELECT * FROM study_card 
@@ -112,6 +127,19 @@ interface StudyCardDao {
         ORDER BY createdAt DESC
     """)
     fun search(query: String): Flow<List<StudyCard>>
+
+    // ★追加: suspend版 search
+    @Query("""
+        SELECT * FROM study_card 
+        WHERE focus LIKE :query 
+           OR tags LIKE :query 
+           OR bestExpressionsRaw LIKE :query
+           OR metaphorChainsRaw LIKE :query
+           OR doNextRaw LIKE :query
+           OR fullParsedContent LIKE :query
+        ORDER BY id DESC LIMIT 100
+    """)
+    suspend fun searchSuspend(query: String): List<StudyCard>
 }
 
 // ========== カスタムルートDAO ==========
@@ -130,7 +158,7 @@ interface CustomRouteDao {
     fun observeAll(): Flow<List<CustomRoute>>
 
     @Query("SELECT * FROM custom_route ORDER BY updatedAt DESC")
-    fun getAll(): Flow<List<CustomRoute>>
+    suspend fun getAll(): List<CustomRoute>
 
     @Query("SELECT * FROM custom_route WHERE id = :id")
     suspend fun getById(id: String): CustomRoute?
@@ -157,6 +185,10 @@ interface PersonaDao {
     @Query("SELECT * FROM persona ORDER BY createdAt DESC")
     fun observeAll(): Flow<List<Persona>>
 
+    // ★追加: suspend版 getAll
+    @Query("SELECT * FROM persona ORDER BY id DESC LIMIT 100")
+    suspend fun getAll(): List<Persona>
+
     @Query("""
         SELECT * FROM persona 
         WHERE name LIKE '%' || :query || '%'
@@ -164,6 +196,23 @@ interface PersonaDao {
            OR style LIKE '%' || :query || '%'
     """)
     fun search(query: String): Flow<List<Persona>>
+
+    // ★追加: suspend版 search
+    @Query("""
+        SELECT * FROM persona 
+        WHERE name LIKE :query 
+           OR location LIKE :query 
+           OR bio LIKE :query 
+           OR style LIKE :query 
+           OR tags LIKE :query
+           OR verificationStatus LIKE :query
+        ORDER BY id DESC LIMIT 100
+    """)
+    suspend fun searchSuspend(query: String): List<Persona>
+
+    // ★追加: ステータス更新
+    @Query("UPDATE persona SET verificationStatus = :status WHERE id = :id")
+    suspend fun updateStatus(id: Long, status: String)
 }
 
 // ========== 練習セッションDAO ==========
@@ -185,7 +234,7 @@ interface PracticeSessionDao {
     fun observeAll(): Flow<List<PracticeSession>>
 
     @Query("SELECT * FROM practice_session ORDER BY createdAt DESC")
-    fun getAll(): Flow<List<PracticeSession>>
+    suspend fun getAll(): List<PracticeSession>
 
     @Query("SELECT * FROM practice_session WHERE isCompleted = 0 ORDER BY createdAt DESC LIMIT 1")
     suspend fun getLastIncomplete(): PracticeSession?
@@ -209,6 +258,10 @@ interface TopicDao {
     @Query("SELECT * FROM topic ORDER BY createdAt DESC")
     fun observeAll(): Flow<List<Topic>>
 
+    // ★追加: suspend版 getAll
+    @Query("SELECT * FROM topic ORDER BY id DESC LIMIT 100")
+    suspend fun getAll(): List<Topic>
+
     @Query("""
         SELECT * FROM topic 
         WHERE title LIKE '%' || :query || '%'
@@ -217,6 +270,22 @@ interface TopicDao {
            OR tags LIKE '%' || :query || '%'
     """)
     fun search(query: String): Flow<List<Topic>>
+
+    // ★追加: suspend版 search
+    @Query("""
+        SELECT * FROM topic 
+        WHERE title LIKE :query 
+           OR emotion LIKE :query 
+           OR scene LIKE :query 
+           OR tags LIKE :query 
+           OR fixConditions LIKE :query
+        ORDER BY id DESC LIMIT 100
+    """)
+    suspend fun searchSuspend(query: String): List<Topic>
+
+    // ★追加: 最近のトピック取得
+    @Query("SELECT * FROM topic ORDER BY id DESC LIMIT :limit")
+    suspend fun getRecent(limit: Int): List<Topic>
 }
 
 // ========== 観察DAO ==========
@@ -237,12 +306,29 @@ interface ObservationDao {
     @Query("SELECT * FROM observation ORDER BY createdAt DESC")
     fun observeAll(): Flow<List<Observation>>
 
+    // ★追加: suspend版 getAll
+    @Query("SELECT * FROM observation ORDER BY id DESC LIMIT 100")
+    suspend fun getAll(): List<Observation>
+
     @Query("""
         SELECT * FROM observation 
         WHERE motif LIKE '%' || :query || '%'
            OR fullContent LIKE '%' || :query || '%'
     """)
     fun search(query: String): Flow<List<Observation>>
+
+    // ★追加: suspend版 search
+    @Query("""
+        SELECT * FROM observation 
+        WHERE motif LIKE :query 
+           OR visualRaw LIKE :query 
+           OR soundRaw LIKE :query 
+           OR metaphorsRaw LIKE :query 
+           OR coreCandidatesRaw LIKE :query
+           OR fullContent LIKE :query
+        ORDER BY id DESC LIMIT 100
+    """)
+    suspend fun searchSuspend(query: String): List<Observation>
 }
 
 // ========== 比較セットDAO ==========
