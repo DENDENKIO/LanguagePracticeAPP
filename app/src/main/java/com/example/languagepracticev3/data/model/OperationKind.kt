@@ -1,5 +1,4 @@
-// app/src/main/java/com/example/languagepracticev3/data/models/OperationKind.kt
-package com.example.languagepracticev3.data.models
+package com.example.languagepracticev3.data.model
 
 enum class OperationKind(val displayName: String, val description: String) {
     READER_AUTO_GEN("読者像生成", "読者像（READER）を自動で1つ提案します（文章生成の前準備用）"),

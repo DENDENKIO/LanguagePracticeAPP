@@ -34,11 +34,12 @@ class MindsetLabViewModel @Inject constructor(
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    private val _selectedMindsets = MutableStateFlow<Set<Int>>(emptySet())
-    val selectedMindsets = _selectedMindsets.asStateFlow()
+    // Set<Int> から List<Int> に変更
+    private val _selectedMindsets = MutableStateFlow<List<Int>>(emptyList())
+    val selectedMindsets: StateFlow<List<Int>> = _selectedMindsets.asStateFlow()
 
     private val _scene = MutableStateFlow("")
-    val scene = _scene.asStateFlow()
+    val scene: StateFlow<String> = _scene.asStateFlow()
 
     val availableMindsets: List<MindsetInfo> = MindsetDefinitions.all.values.toList()
 
@@ -93,13 +94,14 @@ class MindsetLabViewModel @Inject constructor(
     }
 
     fun toggleMindset(id: Int) {
-        _selectedMindsets.value = if (_selectedMindsets.value.contains(id)) {
-            _selectedMindsets.value - id
+        val current = _selectedMindsets.value
+        _selectedMindsets.value = if (current.contains(id)) {
+            current - id
         } else {
-            if (_selectedMindsets.value.size < 3) {
-                _selectedMindsets.value + id
+            if (current.size < 3) {
+                current + id
             } else {
-                _selectedMindsets.value // 最大3つまで
+                current // 最大3つまで
             }
         }
     }
@@ -114,9 +116,11 @@ class MindsetLabViewModel @Inject constructor(
 
     fun saveEntry(type: String, body: String) = addEntry(type, body)
 
-    fun updateEntry(entry: MsEntry) {
+    // 引数を2つ受け取るように変更
+    fun updateEntry(entry: MsEntry, newText: String) {
         viewModelScope.launch {
-            mindsetLabDao.updateEntry(entry)
+            val updated = entry.copy(bodyText = newText)
+            mindsetLabDao.updateEntry(updated)
         }
     }
 

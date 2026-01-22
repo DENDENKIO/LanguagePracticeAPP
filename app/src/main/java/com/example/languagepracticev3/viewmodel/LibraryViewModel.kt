@@ -2,64 +2,154 @@ package com.example.languagepracticev3.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.languagepracticev3.data.database.StudyCardDao
-import com.example.languagepracticev3.data.database.WorkDao
-import com.example.languagepracticev3.data.model.StudyCard
-import com.example.languagepracticev3.data.model.Work
+import com.example.languagepracticev3.data.database.MindsetLabDao
+import com.example.languagepracticev3.data.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 @HiltViewModel
-class LibraryViewModel @Inject constructor(
-    private val workDao: WorkDao,
-    private val studyCardDao: StudyCardDao
+class MindsetLabViewModel @Inject constructor(
+    private val mindsetLabDao: MindsetLabDao
 ) : ViewModel() {
 
-    val works: StateFlow<List<Work>> = workDao.getAll()
+    val days: StateFlow<List<MsDay>> = mindsetLabDao.getAllDays()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val studyCards: StateFlow<List<StudyCard>> = studyCardDao.getAll()
+    private val _selectedDay = MutableStateFlow<MsDay?>(null)
+    val selectedDay: StateFlow<MsDay?> = _selectedDay.asStateFlow()
+
+    val currentDayEntries: StateFlow<List<MsEntry>> = _selectedDay
+        .flatMapLatest { day ->
+            day?.let { mindsetLabDao.getEntriesByDay(it.id) } ?: flowOf(emptyList())
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _searchQuery = MutableStateFlow("")
-    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+    private val _currentScreen = MutableStateFlow(MindsetLabScreen.HOME)
+    val currentScreen: StateFlow<MindsetLabScreen> = _currentScreen.asStateFlow()
 
-    val searchResults: StateFlow<List<Work>> = _searchQuery
-        .debounce(300)
-        .flatMapLatest { query ->
-            if (query.isBlank()) {
-                workDao.getAll()
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    // Set<Int> から List<Int> に変更
+    private val _selectedMindsets = MutableStateFlow<List<Int>>(emptyList())
+    val selectedMindsets: StateFlow<List<Int>> = _selectedMindsets.asStateFlow()
+
+    private val _scene = MutableStateFlow("")
+    val scene: StateFlow<String> = _scene.asStateFlow()
+
+    val availableMindsets: List<MindsetInfo> = MindsetDefinitions.all.values.toList()
+
+    fun navigateTo(screen: MindsetLabScreen) {
+        _currentScreen.value = screen
+    }
+
+    fun selectDay(day: MsDay?) {
+        _selectedDay.value = day
+        if (day != null) {
+            _currentScreen.value = MindsetLabScreen.SESSION
+        }
+    }
+
+    fun createNewDay() {
+        viewModelScope.launch {
+            val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+            val day = MsDay(
+                dateKey = today,
+                focusMindsets = _selectedMindsets.value.joinToString(","),
+                scene = _scene.value,
+                createdAt = today
+            )
+            val id = mindsetLabDao.insertDay(day)
+            selectDay(day.copy(id = id))
+        }
+    }
+
+    fun addEntry(entryType: String, bodyText: String) {
+        viewModelScope.launch {
+            _selectedDay.value?.let { day ->
+                val now = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+                val entry = MsEntry(
+                    dayId = day.id,
+                    entryType = entryType,
+                    bodyText = bodyText,
+                    createdAt = now
+                )
+                mindsetLabDao.insertEntry(entry)
+            }
+        }
+    }
+
+    fun deleteDay(day: MsDay) {
+        viewModelScope.launch {
+            mindsetLabDao.deleteDay(day)
+            if (_selectedDay.value?.id == day.id) {
+                _selectedDay.value = null
+                _currentScreen.value = MindsetLabScreen.HOME
+            }
+        }
+    }
+
+    fun toggleMindset(id: Int) {
+        val current = _selectedMindsets.value
+        _selectedMindsets.value = if (current.contains(id)) {
+            current - id
+        } else {
+            if (current.size < 3) {
+                current + id
             } else {
-                workDao.search(query)
-            }
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    private val _selectedWork = MutableStateFlow<Work?>(null)
-    val selectedWork: StateFlow<Work?> = _selectedWork.asStateFlow()
-
-    fun updateSearchQuery(query: String) {
-        _searchQuery.value = query
-    }
-
-    fun selectWork(work: Work?) {
-        _selectedWork.value = work
-    }
-
-    fun deleteWork(work: Work) {
-        viewModelScope.launch {
-            workDao.delete(work)
-            if (_selectedWork.value?.id == work.id) {
-                _selectedWork.value = null
+                current // 最大3つまで
             }
         }
     }
 
-    fun deleteStudyCard(card: StudyCard) {
+    fun updateScene(newScene: String) {
+        _scene.value = newScene
+    }
+
+    fun createOrUpdateToday() {
+        createNewDay()
+    }
+
+    fun saveEntry(type: String, body: String) = addEntry(type, body)
+
+    // 引数を2つ受け取るように変更
+    fun updateEntry(entry: MsEntry, newText: String) {
         viewModelScope.launch {
-            studyCardDao.delete(card)
+            val updated = entry.copy(bodyText = newText)
+            mindsetLabDao.updateEntry(updated)
         }
     }
+
+    fun deleteEntry(entry: MsEntry) {
+        viewModelScope.launch {
+            mindsetLabDao.deleteEntry(entry)
+        }
+    }
+
+    fun getDrillsForSelectedMindsets(): List<DrillDef> {
+        return _selectedMindsets.value.flatMap { MindsetDefinitions.getDrillsByMindset(it) }
+    }
+
+    fun goBack() {
+        when (_currentScreen.value) {
+            MindsetLabScreen.SESSION -> {
+                _selectedDay.value = null
+                _currentScreen.value = MindsetLabScreen.HOME
+            }
+            MindsetLabScreen.HISTORY -> _currentScreen.value = MindsetLabScreen.HOME
+            MindsetLabScreen.REVIEW -> _currentScreen.value = MindsetLabScreen.HOME
+            else -> {}
+        }
+    }
+}
+
+enum class MindsetLabScreen {
+    HOME,
+    SESSION,
+    HISTORY,
+    REVIEW
 }

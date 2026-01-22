@@ -87,7 +87,6 @@ class WorkbenchViewModel @Inject constructor(
         val output = _uiState.value.aiOutput
         viewModelScope.launch {
             try {
-                // 簡易的なパース（実際にはJSONパーサーを使用することを推奨）
                 val work = Work(
                     kind = _uiState.value.selectedOperation.name,
                     title = "AI生成作品",
@@ -102,7 +101,6 @@ class WorkbenchViewModel @Inject constructor(
         }
     }
 
-    // ナビゲーション用のダミー（MindsetLabViewModelとの互換性が必要な場合）
     fun navigateTo(screen: WorkbenchScreenType) {}
 }
 

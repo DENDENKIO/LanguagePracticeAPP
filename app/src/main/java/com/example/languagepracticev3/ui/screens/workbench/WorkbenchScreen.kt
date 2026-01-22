@@ -69,7 +69,9 @@ fun WorkbenchScreen(
             value = uiState.inputSourceText,
             onValueChange = viewModel::updateInputSourceText,
             label = { Text("原文 / ソーステキスト") },
-            modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 120.dp),
             minLines = 3
         )
 
@@ -144,7 +146,9 @@ fun WorkbenchScreen(
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it },
-                    modifier = Modifier.fillMaxWidth().height(200.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp)
                 )
             },
             confirmButton = {
@@ -175,7 +179,9 @@ private fun OperationSelector(
             readOnly = true,
             label = { Text("操作") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier.fillMaxWidth().menuAnchor()
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor()
         )
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             OperationKind.entries.forEach { op ->
