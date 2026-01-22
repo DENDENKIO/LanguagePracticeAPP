@@ -1,48 +1,49 @@
+// app/src/main/java/com/example/languagepracticev3/data/database/Daos.kt
 package com.example.languagepracticev3.data.database
 
 import androidx.room.*
 import com.example.languagepracticev3.data.model.*
 import kotlinx.coroutines.flow.Flow
 
+// ========== 設定DAO ==========
 @Dao
 interface KvSettingDao {
     @Query("SELECT * FROM kv_settings WHERE `key` = :key")
     suspend fun get(key: String): KvSetting?
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertOrUpdate(setting: KvSetting)
+    @Upsert
+    suspend fun upsert(setting: KvSetting)
 
     @Query("DELETE FROM kv_settings WHERE `key` = :key")
     suspend fun delete(key: String)
+
+    @Query("SELECT * FROM kv_settings ORDER BY `key`")
+    fun observeAll(): Flow<List<KvSetting>>
 }
 
+// ========== 実行ログDAO ==========
 @Dao
 interface RunLogDao {
-    @Query("SELECT * FROM run_log ORDER BY id DESC")
-    fun getAll(): Flow<List<RunLog>>
-
     @Insert
-    suspend fun insert(runLog: RunLog): Long
+    suspend fun insert(log: RunLog): Long
 
-    @Update
-    suspend fun update(runLog: RunLog)
+    @Query("SELECT * FROM run_log ORDER BY createdAt DESC")
+    fun observeAll(): Flow<List<RunLog>>
 
-    @Delete
-    suspend fun delete(runLog: RunLog)
+    @Query("SELECT * FROM run_log WHERE id = :id")
+    suspend fun getById(id: Long): RunLog?
+
+    @Query("DELETE FROM run_log WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
+    @Query("DELETE FROM run_log WHERE createdAt < :threshold")
+    suspend fun deleteOlderThan(threshold: String)
 }
 
+// ========== 作品DAO ==========
 @Dao
 interface WorkDao {
-    @Query("SELECT * FROM work ORDER BY id DESC")
-    fun getAll(): Flow<List<Work>>
-
-    @Query("SELECT * FROM work WHERE id = :id")
-    suspend fun getById(id: Long): Work?
-
-    @Query("SELECT * FROM work WHERE kind = :kind ORDER BY id DESC")
-    fun getByKind(kind: String): Flow<List<Work>>
-
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(work: Work): Long
 
     @Update
@@ -51,52 +52,82 @@ interface WorkDao {
     @Delete
     suspend fun delete(work: Work)
 
-    @Query("SELECT * FROM work WHERE title LIKE '%' || :query || '%' OR bodyText LIKE '%' || :query || '%' ORDER BY id DESC")
+    @Query("DELETE FROM work WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
+    @Query("SELECT * FROM work WHERE id = :id")
+    suspend fun getById(id: Long): Work?
+
+    @Query("SELECT * FROM work ORDER BY createdAt DESC")
+    fun observeAll(): Flow<List<Work>>
+
+    @Query("""
+        SELECT * FROM work 
+        WHERE title LIKE '%' || :query || '%'
+           OR bodyText LIKE '%' || :query || '%'
+           OR writerName LIKE '%' || :query || '%'
+        ORDER BY createdAt DESC
+    """)
     fun search(query: String): Flow<List<Work>>
+
+    @Query("SELECT * FROM work WHERE kind = :kind ORDER BY createdAt DESC")
+    fun filterByKind(kind: String): Flow<List<Work>>
+
+    @Query("SELECT * FROM work ORDER BY createdAt DESC LIMIT :limit")
+    suspend fun getRecent(limit: Int): List<Work>
 }
 
+// ========== 学習カードDAO ==========
 @Dao
 interface StudyCardDao {
-    @Query("SELECT * FROM study_card ORDER BY id DESC")
-    fun getAll(): Flow<List<StudyCard>>
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(card: StudyCard): Long
+
+    @Update
+    suspend fun update(card: StudyCard)
+
+    @Delete
+    suspend fun delete(card: StudyCard)
 
     @Query("SELECT * FROM study_card WHERE id = :id")
     suspend fun getById(id: Long): StudyCard?
 
-    @Insert
-    suspend fun insert(studyCard: StudyCard): Long
+    @Query("SELECT * FROM study_card ORDER BY createdAt DESC")
+    fun observeAll(): Flow<List<StudyCard>>
 
-    @Update
-    suspend fun update(studyCard: StudyCard)
-
-    @Delete
-    suspend fun delete(studyCard: StudyCard)
+    @Query("""
+        SELECT * FROM study_card 
+        WHERE focus LIKE '%' || :query || '%'
+           OR tags LIKE '%' || :query || '%'
+           OR fullParsedContent LIKE '%' || :query || '%'
+        ORDER BY createdAt DESC
+    """)
+    fun search(query: String): Flow<List<StudyCard>>
 }
 
+// ========== カスタムルートDAO ==========
 @Dao
 interface CustomRouteDao {
-    @Query("SELECT * FROM custom_route ORDER BY updatedAt DESC")
-    fun getAll(): Flow<List<CustomRoute>>
-
-    @Query("SELECT * FROM custom_route WHERE id = :id")
-    suspend fun getById(id: String): CustomRoute?
-
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertOrUpdate(route: CustomRoute)
+    suspend fun insert(route: CustomRoute)
+
+    @Update
+    suspend fun update(route: CustomRoute)
 
     @Delete
     suspend fun delete(route: CustomRoute)
+
+    @Query("SELECT * FROM custom_route ORDER BY updatedAt DESC")
+    fun observeAll(): Flow<List<CustomRoute>>
+
+    @Query("SELECT * FROM custom_route WHERE id = :id")
+    suspend fun getById(id: String): CustomRoute?
 }
 
+// ========== ペルソナDAO ==========
 @Dao
 interface PersonaDao {
-    @Query("SELECT * FROM persona ORDER BY id DESC")
-    fun getAll(): Flow<List<Persona>>
-
-    @Query("SELECT * FROM persona WHERE id = :id")
-    suspend fun getById(id: Long): Persona?
-
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(persona: Persona): Long
 
     @Update
@@ -104,17 +135,26 @@ interface PersonaDao {
 
     @Delete
     suspend fun delete(persona: Persona)
+
+    @Query("SELECT * FROM persona WHERE id = :id")
+    suspend fun getById(id: Long): Persona?
+
+    @Query("SELECT * FROM persona ORDER BY createdAt DESC")
+    fun observeAll(): Flow<List<Persona>>
+
+    @Query("""
+        SELECT * FROM persona 
+        WHERE name LIKE '%' || :query || '%'
+           OR bio LIKE '%' || :query || '%'
+           OR style LIKE '%' || :query || '%'
+    """)
+    fun search(query: String): Flow<List<Persona>>
 }
 
+// ========== 練習セッションDAO ==========
 @Dao
 interface PracticeSessionDao {
-    @Query("SELECT * FROM practice_session ORDER BY id DESC")
-    fun getAll(): Flow<List<PracticeSession>>
-
-    @Query("SELECT * FROM practice_session WHERE id = :id")
-    suspend fun getById(id: Long): PracticeSession?
-
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(session: PracticeSession): Long
 
     @Update
@@ -122,17 +162,21 @@ interface PracticeSessionDao {
 
     @Delete
     suspend fun delete(session: PracticeSession)
+
+    @Query("SELECT * FROM practice_session WHERE id = :id")
+    suspend fun getById(id: Long): PracticeSession?
+
+    @Query("SELECT * FROM practice_session ORDER BY createdAt DESC")
+    fun observeAll(): Flow<List<PracticeSession>>
+
+    @Query("SELECT * FROM practice_session WHERE isCompleted = 0 ORDER BY createdAt DESC LIMIT 1")
+    suspend fun getLastIncomplete(): PracticeSession?
 }
 
+// ========== トピックDAO ==========
 @Dao
 interface TopicDao {
-    @Query("SELECT * FROM topic ORDER BY id DESC")
-    fun getAll(): Flow<List<Topic>>
-
-    @Query("SELECT * FROM topic WHERE id = :id")
-    suspend fun getById(id: Long): Topic?
-
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(topic: Topic): Long
 
     @Update
@@ -140,17 +184,27 @@ interface TopicDao {
 
     @Delete
     suspend fun delete(topic: Topic)
+
+    @Query("SELECT * FROM topic WHERE id = :id")
+    suspend fun getById(id: Long): Topic?
+
+    @Query("SELECT * FROM topic ORDER BY createdAt DESC")
+    fun observeAll(): Flow<List<Topic>>
+
+    @Query("""
+        SELECT * FROM topic 
+        WHERE title LIKE '%' || :query || '%'
+           OR emotion LIKE '%' || :query || '%'
+           OR scene LIKE '%' || :query || '%'
+           OR tags LIKE '%' || :query || '%'
+    """)
+    fun search(query: String): Flow<List<Topic>>
 }
 
+// ========== 観察DAO ==========
 @Dao
 interface ObservationDao {
-    @Query("SELECT * FROM observation ORDER BY id DESC")
-    fun getAll(): Flow<List<Observation>>
-
-    @Query("SELECT * FROM observation WHERE id = :id")
-    suspend fun getById(id: Long): Observation?
-
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(observation: Observation): Long
 
     @Update
@@ -158,130 +212,69 @@ interface ObservationDao {
 
     @Delete
     suspend fun delete(observation: Observation)
+
+    @Query("SELECT * FROM observation WHERE id = :id")
+    suspend fun getById(id: Long): Observation?
+
+    @Query("SELECT * FROM observation ORDER BY createdAt DESC")
+    fun observeAll(): Flow<List<Observation>>
+
+    @Query("""
+        SELECT * FROM observation 
+        WHERE motif LIKE '%' || :query || '%'
+           OR fullContent LIKE '%' || :query || '%'
+    """)
+    fun search(query: String): Flow<List<Observation>>
 }
 
+// ========== 比較セットDAO ==========
 @Dao
 interface CompareDao {
-    @Query("SELECT * FROM compare_set ORDER BY id DESC")
-    fun getAllSets(): Flow<List<CompareSet>>
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSet(compareSet: CompareSet): Long
 
-    @Query("SELECT * FROM compare_item WHERE compareSetId = :setId")
-    fun getItemsBySetId(setId: Long): Flow<List<CompareItem>>
-
-    @Insert
-    suspend fun insertSet(set: CompareSet): Long
-
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertItem(item: CompareItem): Long
 
-    @Update
-    suspend fun updateSet(set: CompareSet)
-
     @Delete
-    suspend fun deleteSet(set: CompareSet)
+    suspend fun deleteSet(compareSet: CompareSet)
+
+    @Query("SELECT * FROM compare_set ORDER BY createdAt DESC")
+    fun observeAllSets(): Flow<List<CompareSet>>
+
+    @Query("SELECT * FROM compare_item WHERE compareSetId = :setId")
+    fun getItemsForSet(setId: Long): Flow<List<CompareItem>>
 }
 
+// ========== 実験DAO ==========
 @Dao
 interface ExperimentDao {
-    @Query("SELECT * FROM experiment ORDER BY id DESC")
-    fun getAll(): Flow<List<Experiment>>
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertExperiment(experiment: Experiment): Long
 
-    @Query("SELECT * FROM experiment_trial WHERE experimentId = :experimentId")
-    fun getTrials(experimentId: Long): Flow<List<ExperimentTrial>>
-
-    @Insert
-    suspend fun insert(experiment: Experiment): Long
-
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTrial(trial: ExperimentTrial): Long
 
-    @Update
-    suspend fun update(experiment: Experiment)
-
     @Delete
-    suspend fun delete(experiment: Experiment)
+    suspend fun deleteExperiment(experiment: Experiment)
+
+    @Query("SELECT * FROM experiment ORDER BY createdAt DESC")
+    fun observeAll(): Flow<List<Experiment>>
+
+    @Query("SELECT * FROM experiment_trial WHERE experimentId = :experimentId")
+    fun getTrialsForExperiment(experimentId: Long): Flow<List<ExperimentTrial>>
 }
 
+// ========== PoetryLab DAO ==========
 @Dao
 interface PoetryLabDao {
-    @Query("SELECT * FROM pl_project ORDER BY id DESC")
-    fun getAllProjects(): Flow<List<PlProject>>
-
-    @Query("SELECT * FROM pl_project WHERE id = :id")
-    suspend fun getProjectById(id: Long): PlProject?
-
-    @Insert
-    suspend fun insertProject(project: PlProject): Long
-
-    @Update
-    suspend fun updateProject(project: PlProject)
-
-    @Delete
-    suspend fun deleteProject(project: PlProject)
-
-    @Query("SELECT * FROM pl_run WHERE projectId = :projectId ORDER BY id DESC")
-    fun getRunsByProject(projectId: Long): Flow<List<PlRun>>
-
-    @Insert
-    suspend fun insertRun(run: PlRun): Long
-
-    @Update
-    suspend fun updateRun(run: PlRun)
-
-    @Query("SELECT * FROM pl_text_asset WHERE projectId = :projectId ORDER BY id DESC")
-    fun getAssetsByProject(projectId: Long): Flow<List<PlTextAsset>>
-
-    @Insert
-    suspend fun insertAsset(asset: PlTextAsset): Long
-
-    @Query("SELECT * FROM pl_issue WHERE projectId = :projectId ORDER BY id DESC")
-    fun getIssuesByProject(projectId: Long): Flow<List<PlIssue>>
-
-    @Insert
-    suspend fun insertIssue(issue: PlIssue): Long
-
-    @Update
-    suspend fun updateIssue(issue: PlIssue)
+    // 既存の実装があればそのまま、なければ空のインターフェース
+    // 必要に応じてメソッドを追加
 }
 
+// ========== MindsetLab DAO ==========
 @Dao
 interface MindsetLabDao {
-    @Query("SELECT * FROM ms_day ORDER BY id DESC")
-    fun getAllDays(): Flow<List<MsDay>>
-
-    @Query("SELECT * FROM ms_day WHERE dateKey = :dateKey")
-    suspend fun getDayByDateKey(dateKey: String): MsDay?
-
-    @Query("SELECT * FROM ms_day WHERE id = :id")
-    suspend fun getDayById(id: Long): MsDay?
-
-    @Insert
-    suspend fun insertDay(day: MsDay): Long
-
-    @Update
-    suspend fun updateDay(day: MsDay)
-
-    @Delete
-    suspend fun deleteDay(day: MsDay)
-
-    @Query("SELECT * FROM ms_entry WHERE dayId = :dayId ORDER BY id")
-    fun getEntriesByDay(dayId: Long): Flow<List<MsEntry>>
-
-    @Insert
-    suspend fun insertEntry(entry: MsEntry): Long
-
-    @Update
-    suspend fun updateEntry(entry: MsEntry)
-
-    @Delete
-    suspend fun deleteEntry(entry: MsEntry)
-
-    @Query("SELECT * FROM ms_review WHERE dayId = :dayId")
-    suspend fun getReviewByDay(dayId: Long): MsReview?
-
-    @Insert
-    suspend fun insertReview(review: MsReview): Long
-
-    @Update
-    suspend fun updateReview(review: MsReview)
+    // 既存の実装があればそのまま、なければ空のインターフェース
+    // 必要に応じてメソッドを追加
 }

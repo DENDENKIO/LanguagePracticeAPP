@@ -1,9 +1,12 @@
+// app/src/main/java/com/example/languagepracticev3/viewmodel/SettingsViewModel.kt
 package com.example.languagepracticev3.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.languagepracticev3.data.database.KvSettingDao
 import com.example.languagepracticev3.data.model.KvSetting
+import com.example.languagepracticev3.data.models.AiSiteCatalog
+import com.example.languagepracticev3.data.models.AiSiteProfile
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,11 +27,33 @@ class SettingsViewModel @Inject constructor(
     private val _readerNote = MutableStateFlow("")
     val readerNote: StateFlow<String> = _readerNote.asStateFlow()
 
-    private val _aiSiteUrl = MutableStateFlow("")
-    val aiSiteUrl: StateFlow<String> = _aiSiteUrl.asStateFlow()
+    // AI設定
+    private val _selectedAiSiteId = MutableStateFlow("GENSPARK")
+    val selectedAiSiteId: StateFlow<String> = _selectedAiSiteId.asStateFlow()
+
+    private val _customAiSiteUrl = MutableStateFlow("")
+    val customAiSiteUrl: StateFlow<String> = _customAiSiteUrl.asStateFlow()
+
+    private val _isAutoMode = MutableStateFlow(false)
+    val isAutoMode: StateFlow<Boolean> = _isAutoMode.asStateFlow()
 
     private val _statusMessage = MutableStateFlow("")
     val statusMessage: StateFlow<String> = _statusMessage.asStateFlow()
+
+    // AIサイト一覧
+    val aiSitePresets = AiSiteCatalog.presets
+
+    // 現在選択中のAIサイトプロファイル
+    val selectedAiSiteProfile: AiSiteProfile
+        get() {
+            val preset = AiSiteCatalog.getByIdOrDefault(_selectedAiSiteId.value)
+            // カスタムURLが設定されていればそれを使用
+            return if (_customAiSiteUrl.value.isNotBlank()) {
+                preset.copy(url = _customAiSiteUrl.value)
+            } else {
+                preset
+            }
+        }
 
     init {
         loadSettings()
@@ -38,7 +63,9 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             _writerName.value = kvSettingDao.get("writer_name")?.value ?: ""
             _readerNote.value = kvSettingDao.get("reader_note")?.value ?: ""
-            _aiSiteUrl.value = kvSettingDao.get("ai_site_url")?.value ?: ""
+            _selectedAiSiteId.value = kvSettingDao.get("ai_site_id")?.value ?: "GENSPARK"
+            _customAiSiteUrl.value = kvSettingDao.get("ai_site_url")?.value ?: ""
+            _isAutoMode.value = kvSettingDao.get("auto_mode")?.value?.toBooleanStrictOrNull() ?: false
         }
     }
 
@@ -50,8 +77,19 @@ class SettingsViewModel @Inject constructor(
         _readerNote.value = note
     }
 
-    fun updateAiSiteUrl(url: String) {
-        _aiSiteUrl.value = url
+    fun updateSelectedAiSiteId(siteId: String) {
+        _selectedAiSiteId.value = siteId
+        // プリセット選択時、カスタムURLをプリセットのURLにリセット
+        val preset = AiSiteCatalog.getByIdOrDefault(siteId)
+        _customAiSiteUrl.value = preset.url
+    }
+
+    fun updateCustomAiSiteUrl(url: String) {
+        _customAiSiteUrl.value = url
+    }
+
+    fun updateAutoMode(enabled: Boolean) {
+        _isAutoMode.value = enabled
     }
 
     fun saveSettings() {
@@ -60,7 +98,9 @@ class SettingsViewModel @Inject constructor(
 
             kvSettingDao.insertOrUpdate(KvSetting("writer_name", _writerName.value, now))
             kvSettingDao.insertOrUpdate(KvSetting("reader_note", _readerNote.value, now))
-            kvSettingDao.insertOrUpdate(KvSetting("ai_site_url", _aiSiteUrl.value, now))
+            kvSettingDao.insertOrUpdate(KvSetting("ai_site_id", _selectedAiSiteId.value, now))
+            kvSettingDao.insertOrUpdate(KvSetting("ai_site_url", _customAiSiteUrl.value, now))
+            kvSettingDao.insertOrUpdate(KvSetting("auto_mode", _isAutoMode.value.toString(), now))
 
             _statusMessage.value = "設定を保存しました"
         }

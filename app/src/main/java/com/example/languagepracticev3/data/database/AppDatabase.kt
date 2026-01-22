@@ -1,3 +1,4 @@
+// app/src/main/java/com/example/languagepracticev3/data/database/AppDatabase.kt
 package com.example.languagepracticev3.data.database
 
 import android.content.Context
@@ -36,7 +37,7 @@ import com.example.languagepracticev3.data.model.*
         MsExportLog::class
     ],
     version = 1,
-    exportSchema = true
+    exportSchema = false  // ← この変更のみ
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun kvSettingDao(): KvSettingDao
