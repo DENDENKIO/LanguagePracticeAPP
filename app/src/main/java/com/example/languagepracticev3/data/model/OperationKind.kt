@@ -71,17 +71,4 @@ enum class ReadingLevel {
     LITERARY
 }
 
-/**
- * 長さプロファイル
- */
-enum class LengthProfile(val displayName: String, val minChars: Int, val maxChars: Int) {
-    STUDY_SHORT("練習用（短め）", 90, 200),
-    PRACTICE_MIDDLE("練習用（中）", 250, 450),
-    REVISION_LONG("推敲用（長め）", 450, 800);
-
-    companion object {
-        fun fromName(name: String): LengthProfile {
-            return entries.find { it.name == name } ?: STUDY_SHORT
-        }
-    }
-}
+// ※ LengthProfile は LengthProfile.kt で定義（重複を避ける）
