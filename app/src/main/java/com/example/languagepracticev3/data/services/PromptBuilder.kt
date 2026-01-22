@@ -1,4 +1,3 @@
-// app/src/main/java/com/example/languagepracticev3/data/services/PromptBuilder.kt
 package com.example.languagepracticev3.data.services
 
 import com.example.languagepracticev3.data.model.LengthProfile
@@ -26,7 +25,14 @@ class PromptBuilder {
             OperationKind.CORE_EXTRACT to "⟦CORE_BEGIN⟧",
             OperationKind.REVISION_FULL to "⟦REVISION_BEGIN⟧",
             OperationKind.GIKO to "⟦GIKO_BEGIN⟧",
-            OperationKind.PERSONA_VERIFY_ASSIST to "⟦VERIFY_BEGIN⟧"
+            OperationKind.PERSONA_VERIFY_ASSIST to "⟦VERIFY_BEGIN⟧",
+            // 追加分
+            OperationKind.ANALYZE to "⟦ANALYZE_BEGIN⟧",
+            OperationKind.COMPARE to "⟦COMPARE_BEGIN⟧",
+            OperationKind.OBSERVE to "⟦OBSERVE_BEGIN⟧",
+            OperationKind.POETRY_DRAFT to "⟦POETRY_DRAFT_BEGIN⟧",
+            OperationKind.POETRY_CORE to "⟦POETRY_CORE_BEGIN⟧",
+            OperationKind.POETRY_REV to "⟦POETRY_REV_BEGIN⟧"
         )
 
         val MarkerEnd = mapOf(
@@ -39,7 +45,14 @@ class PromptBuilder {
             OperationKind.CORE_EXTRACT to "⟦CORE_END⟧",
             OperationKind.REVISION_FULL to "⟦REVISION_END⟧",
             OperationKind.GIKO to "⟦GIKO_END⟧",
-            OperationKind.PERSONA_VERIFY_ASSIST to "⟦VERIFY_END⟧"
+            OperationKind.PERSONA_VERIFY_ASSIST to "⟦VERIFY_END⟧",
+            // 追加分
+            OperationKind.ANALYZE to "⟦ANALYZE_END⟧",
+            OperationKind.COMPARE to "⟦COMPARE_END⟧",
+            OperationKind.OBSERVE to "⟦OBSERVE_END⟧",
+            OperationKind.POETRY_DRAFT to "⟦POETRY_DRAFT_END⟧",
+            OperationKind.POETRY_CORE to "⟦POETRY_CORE_END⟧",
+            OperationKind.POETRY_REV to "⟦POETRY_REV_END⟧"
         )
     }
 
@@ -62,13 +75,10 @@ class PromptBuilder {
     }
 
     private fun getLengthInstruction(profile: LengthProfile): Triple<String, Int, Int> {
-        val (min, max) = when (profile) {
-            LengthProfile.MICRO -> 50 to 100
-            LengthProfile.STUDY_SHORT -> 90 to 200
-            LengthProfile.STUDY_MEDIUM -> 250 to 450
-            LengthProfile.STUDY_LONG -> 450 to 800
-            LengthProfile.ESSAY -> 800 to 1500
-        }
+        // LengthProfileに定義されたminChars/maxCharsを使用
+        val min = profile.minChars
+        val max = profile.maxChars
+
         val instruction = """
 【文字量（改行除く文字数）】
 - 本文は指定レンジに収めること（±10〜15%の軽微な誤差は許容）。
@@ -116,7 +126,202 @@ RANGE: ${min}〜${max}字
             OperationKind.REVISION_FULL -> buildRevisionFullPrompt(sourceText, coreTheme, coreEmotion, coreTakeaway, reader, coreSentence)
             OperationKind.GIKO -> buildGikoPrompt(toneLabel, toneRule, reader, topic, sourceText)
             OperationKind.PERSONA_VERIFY_ASSIST -> buildPersonaVerifyPrompt(personaName, personaBio, evidence1, evidence2, evidence3)
+            // 追加された操作に対応
+            OperationKind.ANALYZE -> buildAnalyzePrompt(sourceText, reader)
+            OperationKind.COMPARE -> buildComparePrompt(sourceText, reader)
+            OperationKind.OBSERVE -> buildObservePrompt(sourceText)
+            OperationKind.POETRY_DRAFT -> buildPoetryDraftPrompt(topic, writer, reader, length)
+            OperationKind.POETRY_CORE -> buildPoetryCorePrompt(sourceText)
+            OperationKind.POETRY_REV -> buildPoetryRevPrompt(sourceText, coreTheme, coreEmotion)
         }
+    }
+
+    // ==========================================
+    // 追加: ANALYZE
+    // ==========================================
+    private fun buildAnalyzePrompt(sourceText: String, reader: String): String {
+        val markerBegin = LpConstants.MarkerBegin[OperationKind.ANALYZE]
+        val markerEnd = LpConstants.MarkerEnd[OperationKind.ANALYZE]
+
+        return """
+${getCommonHeader()}
+
+あなたは「テキスト分析者」です。入力されたテキストを分析してください。
+
+【入力】
+READER：$reader
+SOURCE_TEXT：
+$sourceText
+
+【出力フォーマット（厳守）】
+$markerBegin
+SUMMARY：<要約>
+THEMES：<主題のリスト>
+TONE：<文体の特徴>
+STRENGTHS：<良い点>
+IMPROVEMENTS：<改善点>
+$markerEnd
+
+（最後に必ず ${LpConstants.DONE_SENTINEL} を出力）
+        """.trimIndent()
+    }
+
+    // ==========================================
+    // 追加: COMPARE
+    // ==========================================
+    private fun buildComparePrompt(sourceText: String, reader: String): String {
+        val markerBegin = LpConstants.MarkerBegin[OperationKind.COMPARE]
+        val markerEnd = LpConstants.MarkerEnd[OperationKind.COMPARE]
+
+        return """
+${getCommonHeader()}
+
+あなたは「テキスト比較者」です。入力されたテキストを比較分析してください。
+
+【入力】
+READER：$reader
+SOURCE_TEXT：
+$sourceText
+
+【出力フォーマット（厳守）】
+$markerBegin
+SIMILARITIES：<共通点>
+DIFFERENCES：<相違点>
+RECOMMENDATION：<推奨>
+$markerEnd
+
+（最後に必ず ${LpConstants.DONE_SENTINEL} を出力）
+        """.trimIndent()
+    }
+
+    // ==========================================
+    // 追加: OBSERVE
+    // ==========================================
+    private fun buildObservePrompt(sourceText: String): String {
+        val markerBegin = LpConstants.MarkerBegin[OperationKind.OBSERVE]
+        val markerEnd = LpConstants.MarkerEnd[OperationKind.OBSERVE]
+
+        return """
+${getCommonHeader()}
+
+あなたは「観察者」です。入力されたテキストや対象を観察してノートを作成してください。
+
+【入力】
+SOURCE：
+$sourceText
+
+【出力フォーマット（厳守）】
+$markerBegin
+VISUAL：<視覚的観察>
+SOUND：<聴覚的観察>
+OTHER_SENSES：<その他の感覚>
+IMPRESSIONS：<印象・所感>
+$markerEnd
+
+（最後に必ず ${LpConstants.DONE_SENTINEL} を出力）
+        """.trimIndent()
+    }
+
+    // ==========================================
+    // 追加: POETRY_DRAFT
+    // ==========================================
+    private fun buildPoetryDraftPrompt(
+        topic: String,
+        writer: String,
+        reader: String,
+        length: LengthProfile
+    ): String {
+        val (lengthInstruction, min, max) = getLengthInstruction(length)
+        val markerBegin = LpConstants.MarkerBegin[OperationKind.POETRY_DRAFT]
+        val markerEnd = LpConstants.MarkerEnd[OperationKind.POETRY_DRAFT]
+
+        return """
+${getCommonHeader()}
+$lengthInstruction
+
+あなたは「詩の作成者」です。指定されたお題で詩の初稿を作成してください。
+
+【入力】
+TOPIC：$topic
+WRITER：$writer
+READER：$reader
+LENGTH：${min}〜${max}字
+
+【出力フォーマット（厳守）】
+$markerBegin
+TITLE：<タイトル>
+DRAFT：
+<詩の本文>
+
+NOTES：<制作メモ>
+$markerEnd
+
+（最後に必ず ${LpConstants.DONE_SENTINEL} を出力）
+        """.trimIndent()
+    }
+
+    // ==========================================
+    // 追加: POETRY_CORE
+    // ==========================================
+    private fun buildPoetryCorePrompt(sourceText: String): String {
+        val markerBegin = LpConstants.MarkerBegin[OperationKind.POETRY_CORE]
+        val markerEnd = LpConstants.MarkerEnd[OperationKind.POETRY_CORE]
+
+        return """
+${getCommonHeader()}
+
+あなたは「詩の核抽出者」です。入力された詩から核となる要素を抽出してください。
+
+【入力】
+SOURCE_POEM：
+$sourceText
+
+【出力フォーマット（厳守）】
+$markerBegin
+THEME：<主題>
+EMOTION：<感情>
+KEY_IMAGES：<重要なイメージ>
+CORE_LINE：<核となる一行>
+$markerEnd
+
+（最後に必ず ${LpConstants.DONE_SENTINEL} を出力）
+        """.trimIndent()
+    }
+
+    // ==========================================
+    // 追加: POETRY_REV
+    // ==========================================
+    private fun buildPoetryRevPrompt(
+        sourceText: String,
+        coreTheme: String,
+        coreEmotion: String
+    ): String {
+        val markerBegin = LpConstants.MarkerBegin[OperationKind.POETRY_REV]
+        val markerEnd = LpConstants.MarkerEnd[OperationKind.POETRY_REV]
+
+        return """
+${getCommonHeader()}
+
+あなたは「詩の推敲者」です。核を維持しながら詩を推敲してください。
+
+【不変条件】
+THEME：$coreTheme
+EMOTION：$coreEmotion
+
+【入力】
+SOURCE_POEM：
+$sourceText
+
+【出力フォーマット（厳守）】
+$markerBegin
+REVISED_POEM：
+<推敲後の詩>
+
+CHANGES：<変更点の説明>
+$markerEnd
+
+（最後に必ず ${LpConstants.DONE_SENTINEL} を出力）
+        """.trimIndent()
     }
 
     // ==========================================
@@ -289,7 +494,7 @@ $markerEnd
     }
 
     // ==========================================
-    // K-5. TEXT_GEN（★TOPIC空白時：AIが自由に自作＋SEEDで多様化）
+    // K-5. TEXT_GEN
     // ==========================================
     fun buildTextGenPrompt(
         writer: String,
@@ -306,7 +511,6 @@ $markerEnd
         val writerInstruction = if (writer.isBlank()) "AIにお任せ" else writer
         val isTopicEmpty = topic.isBlank()
 
-        // 毎回変わるseed
         val seed = UUID.randomUUID().toString().replace("-", "").take(10)
 
         val readerSection = if (readerResolved.isNotBlank()) {
@@ -322,16 +526,7 @@ $markerEnd
 【TOPICが空のとき（重要）】
 - TOPICはAIが「新規に自作」する（こちらから候補は与えない）。
 - ただし毎回似た発想に寄らないように、下のSEEDを乱数種として使い、発想を意図的に散らす。
-- 手順（出力には書かないでよい）：
-  1) SEEDからランダム性を作り、まずTOPIC候補を最低3案、互いに違う方向性で作る（場所/時間/出来事/小物/感情を変える）。
-  2) その中で「最も具体的で、最も新鮮」な1案を選び、TOPICを1行で確定する。
-  3) 本文は確定したTOPICに一致させる。
 SEED：$seed
-
-【TOPICの要件】
-- 1行で具体的（抽象語だけで終わらない）。
-- 場所・時間帯・小さな具体物（小物）・出来事（動き）・感情のどれか2つ以上が想像できる内容にする。
-- 既視感のある定番の方向性に寄りすぎないようにする（多様性を優先）。
             """.trimIndent()
         } else ""
 
@@ -352,20 +547,14 @@ LENGTH_RANGE：${min}〜${max}字（改行除く）
 
 $topicAutoSection
 
-【ルール】
-- 読者像（READER）に合わせて、語彙難度・比喩密度・説明量・余韻の長さを調整する。
-- TOPICやWRITERが空欄の場合は上記ルールに従う（TOPICは必ず確定してから書く）。
-- TONEが「なし」なら通常の現代日本語。指定があれば"軽く"寄せる（厳密な文体変換はしない）。
-- 出力はマーカー内のみ。
-
 【出力フォーマット（厳守）】
 $markerBegin
-WRITER：<実際に用いた書き手（指定なしなら「指定なし」）>
+WRITER：<実際に用いた書き手>
 READER：$readerResolved
-TOPIC：<実際に用いたお題（空欄時は自作した1行）>
+TOPIC：<実際に用いたお題>
 LENGTH_PROFILE：$lengthProfile
 TEXT：
-<本文（${min}〜${max}字 目安。改行可）>
+<本文>
 
 TECHNIQUE_MEMO：
 - <五感>
@@ -397,18 +586,12 @@ TONE：$toneInstruction
 SOURCE_TEXT：
 $sourceText
 
-【ルール】
-- BEST_EXPRESSIONSは原文からの引用（改変禁止）。
-- METAPHOR_CHAINSは「感覚→比喩→感情/問い」の形で3本。
-- DO_NEXTは必ず3つ、短く具体的に（実行可能な指示にする）。
-- URL/Markdown/前置き禁止。
-
 【出力フォーマット（厳守）】
 $markerBegin
 META：
 - READER：$readerResolved
 - TONE：$toneInstruction
-- FOCUS：<効きの要約（短く）>
+- FOCUS：<効きの要約>
 - LEVEL：<EASY|NORMAL|LITERARY>
 
 BEST_EXPRESSIONS：
@@ -416,38 +599,7 @@ BEST_EXPRESSIONS：
 - <一文2>
 - <一文3>
 
-SENSORY_MAP：
-- VISUAL：<3〜8個>
-- SOUND：<0〜5個>
-- SMELL_AIR：<0〜5個>
-- TOUCH_TEMP：<0〜5個>
-- BODY_WEIGHT：<0〜5個>
-
-METAPHOR_CHAINS：
-- CHAIN1：<感覚語> → <比喩> → <感情/問い>
-- CHAIN2：...
-- CHAIN3：...
-
-RHYTHM_NOTES：
-- <音調所見1>
-- <音調所見2>
-- <音調所見3>
-
-STRUCTURE_NOTES：
-- CORE_GUESS：<主題/感情/問い/読者像の推定を1〜2文>
-- OPENING_MOVE：<導入の型>
-- ENDING_MOVE：<終わり方の型>
-
-DO_NEXT：
-- TASK1：<90〜150字など具体条件を含める>
-- TASK2：<差し替え/書き換えなど>
-- TASK3：<100→50→25など>
-
-AVOID：
-- <悪手1>
-- <悪手2>
-
-TAGS：<カンマ区切り3〜10個>
+TAGS：<カンマ区切り>
 $markerEnd
 
 （最後に必ず ${LpConstants.DONE_SENTINEL} を出力）
@@ -464,17 +616,12 @@ $markerEnd
         return """
 ${getCommonHeader()}
 
-あなたは「文章の核（Core）を抽出する担当」です。本文から核を明確化してください。
+あなたは「文章の核（Core）を抽出する担当」です。
 
 【入力】
-READER（固定）：$readerResolved
+READER：$readerResolved
 TEXT：
 $sourceText
-
-【ルール】
-- READERは入力のまま維持し、勝手に変更しない。
-- CORE_SENTENCEは1文でまとめる。
-- 不明な点があればQUESTIONSに1〜3個の確認質問を出す。
 
 【出力フォーマット（厳守）】
 $markerBegin
@@ -483,9 +630,6 @@ EMOTION：...
 TAKEAWAY：...
 READER：$readerResolved
 CORE_SENTENCE：...
-MUST_KEEP：...（任意）
-CAN_CUT：...（任意）
-QUESTIONS：...（任意：必要な場合のみ）
 $markerEnd
 
 （最後に必ず ${LpConstants.DONE_SENTINEL} を出力）
@@ -509,9 +653,9 @@ $markerEnd
         return """
 ${getCommonHeader()}
 
-あなたは「推敲者」です。核（Core）を不変条件として維持し、本文を3案の方針で全文改稿してください。
+あなたは「推敲者」です。核を維持し、本文を改稿してください。
 
-【不変条件（絶対に変えない）】
+【不変条件】
 THEME：$coreTheme
 EMOTION：$coreEmotion
 TAKEAWAY：$coreTakeaway
@@ -521,52 +665,12 @@ CORE_SENTENCE：$coreSentence
 【対象本文】
 $sourceText
 
-【3案の方針】
-- A：凝縮。核が最短で刺さる構成。
-- B：五感・比喩・音調を増幅（描写の密度と響き）。
-- C：余韻・問いの残し方を設計（終わりの効果）。
-
-【ルール】
-- 各案で「GLOBAL_CHANGES（CUT/MOVE/ADD）」を必ず書く。
-- 各案で本文（REVISED_TEXT）を必ず全文出す。
-- URL/Markdown/前置き禁止。
-
 【出力フォーマット（厳守）】
 $markerBegin
-
-@@@REVISION|A@@@
-INTENT：凝縮。核が最短で刺さる構成。
-GLOBAL_CHANGES：
-- CUT：...
-- MOVE：...
-- ADD：...
-LOCAL_CHANGES：
-- ...
 REVISED_TEXT：
 ...
 
-@@@REVISION|B@@@
-INTENT：五感・比喩・音調を増幅（描写の密度と響き）。
-GLOBAL_CHANGES：
-- CUT：...
-- MOVE：...
-- ADD：...
-LOCAL_CHANGES：
-- ...
-REVISED_TEXT：
-...
-
-@@@REVISION|C@@@
-INTENT：余韻・問いの残し方を設計（終わりの効果）。
-GLOBAL_CHANGES：
-- CUT：...
-- MOVE：...
-- ADD：...
-LOCAL_CHANGES：
-- ...
-REVISED_TEXT：
-...
-
+CHANGES：<変更点>
 $markerEnd
 
 （最後に必ず ${LpConstants.DONE_SENTINEL} を出力）
@@ -589,34 +693,23 @@ $markerEnd
         return """
 ${getCommonHeader()}
 
-あなたは古典文体の専門家です。入力本文の意味や情景を変えず、指定文調に書き換えてください。
+あなたは古典文体の専門家です。入力本文を指定文調に書き換えてください。
 
 【入力】
-TONE（固定）：$toneLabel
-READER（任意）：$readerOrEmpty
-お題（任意）：$topicLineOrEmpty
+TONE：$toneLabel
+READER：$readerOrEmpty
+お題：$topicLineOrEmpty
 
-【入力本文（現代文）】
+【入力本文】
 $inputBody
 
-【文調ルール（必ず適用）】
+【文調ルール】
 $toneRuleText
-
-【共通ルール】
-- 意味や情景を変えず、文体だけを変える。
-- ルビは難読語のみ最小限（歴史的仮名遣いを意識）。
-- 最後に語彙変換表（現代語/擬古文/理由）を付ける。
 
 【出力形式（厳守）】
 $markerBegin
 TONE：$toneLabel
-READER：$readerOrEmpty
 GIKO_TEXT：
-...
-
-VOCAB_TABLE：
-| 現代語 | 擬古文 | 理由 |
-|---|---|---|
 ...
 $markerEnd
 
@@ -640,49 +733,24 @@ $markerEnd
         return """
 ${getCommonHeader()}
 
-あなたは「人物プロフィールの検証支援者」です。Web検索は行わず、貼付された根拠テキスト（E1〜E3）の範囲でのみ判定してください。
+あなたは「人物プロフィールの検証支援者」です。
 
-【対象Persona（現在の記述）】
+【対象Persona】
 NAME：$personaName
 BIO：$personaBio
 
-【根拠テキスト（Evidence）】
-E1：
-$e1
-
-E2：
-$e2
-
-E3：
-$e3
-
-【絶対ルール】
-- 根拠テキスト（E1〜E3）に書かれていないことは断定しない。
-- 判定は次の4値のみ：SUPPORTED / NOT_SUPPORTED / CONTRADICTED / UNCLEAR
-- 出力にURL/リンク/出典列挙は書かない。
+【根拠テキスト】
+E1：$e1
+E2：$e2
+E3：$e3
 
 【出力フォーマット（厳守）】
 $markerBegin
 TARGET：
 NAME：$personaName
 
-CLAIMS：
-@@@CLAIM|1@@@
-FIELD：<BIO|STYLE|LOCATION|DATES|WORKS|TAGS|OTHER>
-CLAIM：<検証対象の主張を1文>
 VERDICT：SUPPORTED|NOT_SUPPORTED|CONTRADICTED|UNCLEAR
-EVIDENCE_QUOTE：<短い抜粋（該当なしなら（該当なし））>
-REASON：<1〜2文。根拠外断定禁止>
-SUGGESTED_EDIT：<どう直すべきか短く>
-@@@CLAIM_END@@@
-（以下繰り返し）
-
-REVISED_PERSONA_DRAFT：
-BIO：<根拠に基づき必要なら修正。根拠がなければ現状維持/保留>
-
-STATUS_RECOMMENDATION：
-SUGGESTED_STATUS：UNVERIFIED|PARTIALLY_VERIFIED|VERIFIED|DISPUTED
-WHY：<2〜3行>
+REASON：<理由>
 $markerEnd
 
 （最後に必ず ${LpConstants.DONE_SENTINEL} を出力）
