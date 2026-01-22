@@ -1,4 +1,3 @@
-// app/src/main/java/com/example/languagepracticev3/data/database/AppDatabase.kt
 package com.example.languagepracticev3.data.database
 
 import android.content.Context
@@ -36,8 +35,8 @@ import com.example.languagepracticev3.data.model.*
         MsReview::class,
         MsExportLog::class
     ],
-    version = 1,
-    exportSchema = false  // ← この変更のみ
+    version = 2,
+    exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun kvSettingDao(): KvSettingDao
@@ -64,7 +63,9 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "language_practice_db"
-                ).build()
+                )
+                    .fallbackToDestructiveMigration() // ← 追加：マイグレーション失敗時にDBを再作成
+                    .build()
                 INSTANCE = instance
                 instance
             }

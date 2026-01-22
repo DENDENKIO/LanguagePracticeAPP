@@ -70,7 +70,7 @@ fun RoutesScreen(
                     }
                     
                     item {
-                        Divider(modifier = Modifier.padding(vertical = 8.dp))
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                         Text(
                             "カスタムルート",
                             style = MaterialTheme.typography.titleSmall,
