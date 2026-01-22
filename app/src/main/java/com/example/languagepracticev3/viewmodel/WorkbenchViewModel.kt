@@ -159,26 +159,26 @@ class WorkbenchViewModel @Inject constructor(
             OperationKind.TEXT_GEN -> promptBuilder.buildTextGenPrompt(
                 writer = state.inputWriter,
                 topic = state.inputTopic,
-                reader = state.inputReader,
-                constraint = "",
+                coreReader = state.inputReader,
+                tone = "",
                 length = state.selectedLength
             )
             OperationKind.STUDY_CARD -> promptBuilder.buildStudyCardPrompt(
-                reader = state.inputReader,
-                constraint = "",
+                coreReader = state.inputReader,
+                tone = "",
                 sourceText = state.inputSourceText
             )
             OperationKind.PERSONA_GEN -> promptBuilder.buildPersonaGenPrompt(state.inputGenre)
             OperationKind.TOPIC_GEN -> promptBuilder.buildTopicGenPrompt(state.inputImageUrl)
             OperationKind.OBSERVE_IMAGE -> promptBuilder.buildObserveImagePrompt(state.inputImageUrl)
             OperationKind.CORE_EXTRACT -> promptBuilder.buildCoreExtractPrompt(
-                reader = state.inputReader,
+                coreReader = state.inputReader,
                 sourceText = state.inputSourceText
             )
             OperationKind.GIKO -> promptBuilder.buildGikoPrompt(
                 toneLabel = state.inputToneLabel,
                 toneRule = state.inputToneRule,
-                reader = state.inputReader,
+                coreReader = state.inputReader,
                 topic = state.inputTopic,
                 sourceText = state.inputSourceText
             )
@@ -187,7 +187,7 @@ class WorkbenchViewModel @Inject constructor(
                 coreTheme = state.inputCoreTheme,
                 coreEmotion = state.inputCoreEmotion,
                 coreTakeaway = state.inputCoreTakeaway,
-                reader = state.inputReader,
+                coreReader = state.inputReader,
                 coreSentence = state.inputCoreSentence
             )
             OperationKind.PERSONA_VERIFY_ASSIST -> promptBuilder.buildPersonaVerifyPrompt(

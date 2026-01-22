@@ -19,7 +19,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.languagepracticev3.data.model.AiSiteProfile
-import com.example.languagepracticev3.data.services.PromptBuilder
+import com.example.languagepracticev3.data.model.LpConstants  // ← 修正: LpConstantsを直接インポート
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -46,7 +46,8 @@ fun AiBrowserScreen(
     var lastTextLength by remember { mutableIntStateOf(0) }
     var stableCount by remember { mutableIntStateOf(0) }
 
-    val doneSentinel = PromptBuilder.LpConstants.DONE_SENTINEL
+    // 修正: PromptBuilder.LpConstants → LpConstants
+    val doneSentinel = LpConstants.DONE_SENTINEL
     val promptSentinelCount = remember { countSentinel(prompt, doneSentinel) }
 
     // JavaScript Interface for receiving results
@@ -280,11 +281,11 @@ private fun extractAiResponse(fullText: String, promptSentinelCount: Int, sentin
     val aiSentinelPos = afterPrompt.indexOf(sentinel)
     if (aiSentinelPos == -1) return afterPrompt
 
-    // マーカーを探す
-    val markers = PromptBuilder.LpConstants.MarkerBegin.values
+    // 修正: LpConstants.MarkerBegin.values を正しくイテレート
+    val markerValues: Collection<String> = LpConstants.MarkerBegin.values
     var bestMarkerPos = -1
 
-    for (marker in markers) {
+    for (marker in markerValues) {
         val markerPos = afterPrompt.indexOf(marker)
         if (markerPos != -1 && markerPos < aiSentinelPos && markerPos > bestMarkerPos) {
             bestMarkerPos = markerPos
