@@ -9,6 +9,7 @@ import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,6 +26,8 @@ import kotlinx.coroutines.launch
 /**
  * AI WebView 自動送信画面
  * ★修正版: 2回送信問題・早すぎる取り込み問題を解消
+ * ★修正: Icons.Filled.Send → Icons.AutoMirrored.Filled.Send
+ * ★修正: databaseEnabled 非推奨警告を抑制
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,28 +44,25 @@ fun AiBrowserScreen(
     var statusMessage by remember { mutableStateOf("読み込み中...") }
     var isLoading by remember { mutableStateOf(true) }
 
-    // ★修正: mutableIntStateOf → mutableStateOf<Int> に変更（互換性のため）
     var injectionState by remember { mutableStateOf(InjectionState.NOT_STARTED) }
     var isMonitoring by remember { mutableStateOf(false) }
     var lastTextLength by remember { mutableStateOf(0) }
     var stableCount by remember { mutableStateOf(0) }
 
-    // ★修正: AI応答開始検出用
     var responseStarted by remember { mutableStateOf(false) }
     var initialPageTextLength by remember { mutableStateOf(0) }
 
     val doneSentinel = LpConstants.DONE_SENTINEL
     val promptSentinelCount = remember { countSentinel(prompt, doneSentinel) }
 
-    // 監視ループ（★修正: AI応答開始を確認してから安定判定）
+    // 監視ループ
     LaunchedEffect(isMonitoring) {
         if (!isMonitoring) return@LaunchedEffect
 
-        // ★修正: 監視開始時に少し待機（AIが応答開始するまで）
         delay(2000)
 
         while (isMonitoring) {
-            delay(1500) // ★修正: 間隔を長めに
+            delay(1500)
 
             webView?.let { wv ->
                 wv.evaluateJavascript("document.body.innerText") { rawText ->
@@ -75,9 +75,7 @@ fun AiBrowserScreen(
                     val totalSentinelCount = countSentinel(currentText, doneSentinel)
                     val requiredCount = promptSentinelCount + 1
 
-                    // ★修正: AI応答開始の検出
                     if (!responseStarted) {
-                        // テキスト長が初期より大幅に増えたら応答開始
                         if (currentLength > initialPageTextLength + 100) {
                             responseStarted = true
                             statusMessage = "AI応答検出。生成完了を待機中..."
@@ -89,14 +87,12 @@ fun AiBrowserScreen(
 
                     statusMessage = "監視中: Sentinel=$totalSentinelCount/$requiredCount, 長さ=$currentLength, 安定=$stableCount/7"
 
-                    // ★修正: センチネル必要数チェック（応答開始後のみ）
                     if (totalSentinelCount < requiredCount) {
                         stableCount = 0
                         lastTextLength = currentLength
                         return@evaluateJavascript
                     }
 
-                    // テキスト長が安定しているかチェック
                     if (currentLength != lastTextLength) {
                         stableCount = 0
                         lastTextLength = currentLength
@@ -104,13 +100,12 @@ fun AiBrowserScreen(
                         stableCount++
                     }
 
-                    // ★修正: 安定判定を厳しく（7回連続で安定）
                     if (stableCount >= 7) {
                         isMonitoring = false
                         statusMessage = "生成完了！結果を取得中..."
 
                         scope.launch {
-                            delay(1500) // ★修正: 最終確認の待機
+                            delay(1500)
                             wv.evaluateJavascript("document.body.innerText") { finalRaw ->
                                 val fullText = finalRaw
                                     .removeSurrounding("\"")
@@ -127,9 +122,8 @@ fun AiBrowserScreen(
         }
     }
 
-    // ★修正: プロンプト注入関数（状態管理強化）
+    // プロンプト注入関数
     fun injectPrompt() {
-        // ★修正: 既に注入済みまたは処理中なら何もしない
         if (injectionState != InjectionState.NOT_STARTED &&
             injectionState != InjectionState.FAILED) {
             statusMessage = "既に送信済みまたは処理中です"
@@ -151,7 +145,6 @@ fun AiBrowserScreen(
                     injectionState = InjectionState.COMPLETED
                     statusMessage = "入力完了。AI応答を待機中..."
 
-                    // ★修正: 初期テキスト長を記録してから監視開始
                     wv.evaluateJavascript("document.body.innerText.length") { lengthStr ->
                         initialPageTextLength = lengthStr.replace("\"", "").toIntOrNull() ?: 0
                         lastTextLength = 0
@@ -179,7 +172,6 @@ fun AiBrowserScreen(
                     }
                 },
                 actions = {
-                    // ★修正: 再送信ボタンは失敗時または未開始時のみ有効
                     IconButton(
                         onClick = {
                             injectionState = InjectionState.NOT_STARTED
@@ -188,7 +180,8 @@ fun AiBrowserScreen(
                         enabled = injectionState == InjectionState.FAILED ||
                                 injectionState == InjectionState.NOT_STARTED
                     ) {
-                        Icon(Icons.Default.Send, "再送信")
+                        // ★修正: AutoMirrored版を使用
+                        Icon(Icons.AutoMirrored.Filled.Send, "再送信")
                     }
                     IconButton(onClick = {
                         val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
@@ -243,6 +236,8 @@ fun AiBrowserScreen(
                     @SuppressLint("SetJavaScriptEnabled")
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
+                    // ★修正: databaseEnabled は非推奨だが、互換性のため残す（警告は抑制）
+                    @Suppress("DEPRECATION")
                     settings.databaseEnabled = true
                     settings.loadWithOverviewMode = true
                     settings.useWideViewPort = true
@@ -253,12 +248,10 @@ fun AiBrowserScreen(
                             super.onPageFinished(view, url)
                             isLoading = false
 
-                            // ★修正: 注入が未開始の場合のみ自動実行
                             if (injectionState == InjectionState.NOT_STARTED) {
                                 statusMessage = "読み込み完了。3秒後に自動入力..."
                                 scope.launch {
                                     delay(3000)
-                                    // ★修正: 再度状態チェック
                                     if (injectionState == InjectionState.NOT_STARTED) {
                                         injectPrompt()
                                     }
@@ -278,7 +271,7 @@ fun AiBrowserScreen(
     }
 }
 
-// ★追加: 注入状態を管理するenum
+// 注入状態を管理するenum
 private enum class InjectionState {
     NOT_STARTED,
     INJECTING,

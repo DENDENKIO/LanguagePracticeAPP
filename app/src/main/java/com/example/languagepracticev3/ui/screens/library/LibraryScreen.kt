@@ -327,7 +327,6 @@ private fun WorksList(
                         )
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
-                        // ★修正: Null安全対応
                         Text(
                             text = work.title?.ifBlank { "(無題)" } ?: "(無題)",
                             style = MaterialTheme.typography.titleMedium,
@@ -335,7 +334,6 @@ private fun WorksList(
                             overflow = TextOverflow.Ellipsis
                         )
                         Spacer(Modifier.height(4.dp))
-                        // ★修正: Null安全対応
                         Text(
                             text = (work.bodyText ?: "").take(100),
                             style = MaterialTheme.typography.bodySmall,
@@ -347,11 +345,9 @@ private fun WorksList(
                         Row {
                             AssistChip(
                                 onClick = {},
-                                // ★修正: Null安全対応
                                 label = { Text(work.kind.ifBlank { "UNKNOWN" }) },
                                 modifier = Modifier.height(24.dp)
                             )
-                            // ★修正: Null安全対応
                             val writerName = work.writerName
                             if (!writerName.isNullOrBlank()) {
                                 Spacer(Modifier.width(4.dp))
@@ -394,13 +390,11 @@ private fun StudyCardsList(
                         )
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
-                        // ★修正: Null安全対応
                         Text(
                             text = "Focus: ${card.focus ?: "(未設定)"}",
                             style = MaterialTheme.typography.titleMedium
                         )
                         Spacer(Modifier.height(4.dp))
-                        // ★修正: Null安全対応
                         Text(
                             text = "Level: ${card.level ?: "-"} | Tags: ${card.tags ?: "-"}",
                             style = MaterialTheme.typography.bodySmall,
@@ -672,9 +666,10 @@ private fun PersonaEditDialog(
                         readOnly = true,
                         label = { Text("検証ステータス") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+                        // ★修正: menuAnchor() → menuAnchor(MenuAnchorType.PrimaryNotEditable)
                         modifier = Modifier
                             .fillMaxWidth()
-                            .menuAnchor()
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
                     )
                     ExposedDropdownMenu(
                         expanded = expanded,
@@ -762,9 +757,10 @@ private fun TopicEditDialog(
                         readOnly = true,
                         label = { Text("シーン") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+                        // ★修正: menuAnchor() → menuAnchor(MenuAnchorType.PrimaryNotEditable)
                         modifier = Modifier
                             .fillMaxWidth()
-                            .menuAnchor()
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
                     )
                     ExposedDropdownMenu(
                         expanded = expanded,
@@ -847,7 +843,7 @@ private fun DetailDialog(
 }
 
 // ==========================================
-// ヘルパー（★Null安全対応）
+// ヘルパー（Null安全対応）
 // ==========================================
 
 private fun buildWorkDetail(work: Work): String = """
