@@ -19,6 +19,9 @@ interface KvSettingDao {
 
     @Query("SELECT * FROM kv_settings ORDER BY `key`")
     fun observeAll(): Flow<List<KvSetting>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrUpdate(setting: KvSetting)
 }
 
 // ========== 実行ログDAO ==========
@@ -61,6 +64,9 @@ interface WorkDao {
     @Query("SELECT * FROM work ORDER BY createdAt DESC")
     fun observeAll(): Flow<List<Work>>
 
+    @Query("SELECT * FROM work ORDER BY createdAt DESC")
+    fun getAll(): Flow<List<Work>>
+
     @Query("""
         SELECT * FROM work 
         WHERE title LIKE '%' || :query || '%'
@@ -95,6 +101,9 @@ interface StudyCardDao {
     @Query("SELECT * FROM study_card ORDER BY createdAt DESC")
     fun observeAll(): Flow<List<StudyCard>>
 
+    @Query("SELECT * FROM study_card ORDER BY createdAt DESC")
+    fun getAll(): Flow<List<StudyCard>>
+
     @Query("""
         SELECT * FROM study_card 
         WHERE focus LIKE '%' || :query || '%'
@@ -120,8 +129,14 @@ interface CustomRouteDao {
     @Query("SELECT * FROM custom_route ORDER BY updatedAt DESC")
     fun observeAll(): Flow<List<CustomRoute>>
 
+    @Query("SELECT * FROM custom_route ORDER BY updatedAt DESC")
+    fun getAll(): Flow<List<CustomRoute>>
+
     @Query("SELECT * FROM custom_route WHERE id = :id")
     suspend fun getById(id: String): CustomRoute?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrUpdate(route: CustomRoute)
 }
 
 // ========== ペルソナDAO ==========
@@ -168,6 +183,9 @@ interface PracticeSessionDao {
 
     @Query("SELECT * FROM practice_session ORDER BY createdAt DESC")
     fun observeAll(): Flow<List<PracticeSession>>
+
+    @Query("SELECT * FROM practice_session ORDER BY createdAt DESC")
+    fun getAll(): Flow<List<PracticeSession>>
 
     @Query("SELECT * FROM practice_session WHERE isCompleted = 0 ORDER BY createdAt DESC LIMIT 1")
     suspend fun getLastIncomplete(): PracticeSession?
@@ -268,13 +286,76 @@ interface ExperimentDao {
 // ========== PoetryLab DAO ==========
 @Dao
 interface PoetryLabDao {
-    // 既存の実装があればそのまま、なければ空のインターフェース
-    // 必要に応じてメソッドを追加
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertProject(project: PlProject): Long
+
+    @Update
+    suspend fun updateProject(project: PlProject)
+
+    @Delete
+    suspend fun deleteProject(project: PlProject)
+
+    @Query("SELECT * FROM pl_project ORDER BY updatedAt DESC")
+    fun getAllProjects(): Flow<List<PlProject>>
+
+    @Query("SELECT * FROM pl_project WHERE id = :id")
+    suspend fun getProjectById(id: Long): PlProject?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertRun(run: PlRun): Long
+
+    @Query("SELECT * FROM pl_run WHERE projectId = :projectId ORDER BY createdAt DESC")
+    fun getRunsByProject(projectId: Long): Flow<List<PlRun>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAsset(asset: PlTextAsset): Long
+
+    @Query("SELECT * FROM pl_text_asset WHERE projectId = :projectId ORDER BY createdAt DESC")
+    fun getAssetsByProject(projectId: Long): Flow<List<PlTextAsset>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertIssue(issue: PlIssue): Long
+
+    @Update
+    suspend fun updateIssue(issue: PlIssue)
+
+    @Query("SELECT * FROM pl_issue WHERE projectId = :projectId ORDER BY createdAt DESC")
+    fun getIssuesByProject(projectId: Long): Flow<List<PlIssue>>
 }
 
 // ========== MindsetLab DAO ==========
 @Dao
 interface MindsetLabDao {
-    // 既存の実装があればそのまま、なければ空のインターフェース
-    // 必要に応じてメソッドを追加
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDay(day: MsDay): Long
+
+    @Update
+    suspend fun updateDay(day: MsDay)
+
+    @Delete
+    suspend fun deleteDay(day: MsDay)
+
+    @Query("SELECT * FROM ms_day ORDER BY createdAt DESC")
+    fun getAllDays(): Flow<List<MsDay>>
+
+    @Query("SELECT * FROM ms_day WHERE id = :id")
+    suspend fun getDayById(id: Long): MsDay?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertEntry(entry: MsEntry): Long
+
+    @Update
+    suspend fun updateEntry(entry: MsEntry)
+
+    @Delete
+    suspend fun deleteEntry(entry: MsEntry)
+
+    @Query("SELECT * FROM ms_entry WHERE dayId = :dayId ORDER BY createdAt DESC")
+    fun getEntriesByDay(dayId: Long): Flow<List<MsEntry>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertReview(review: MsReview): Long
+
+    @Query("SELECT * FROM ms_review WHERE dayId = :dayId")
+    fun getReviewsByDay(dayId: Long): Flow<List<MsReview>>
 }

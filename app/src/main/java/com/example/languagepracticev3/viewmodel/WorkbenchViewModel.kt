@@ -1,111 +1,109 @@
-// app/src/main/java/com/example/languagepracticev3/viewmodel/WorkbenchViewModel.kt
 package com.example.languagepracticev3.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.languagepracticev3.data.model.*
+import com.example.languagepracticev3.data.database.WorkDao
+import com.example.languagepracticev3.data.model.OperationKind
+import com.example.languagepracticev3.data.model.Work
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
+
+sealed class SaveResult {
+    data class Success(val count: Int, val type: String) : SaveResult()
+    data class Error(val message: String) : SaveResult()
+}
+
+data class WorkbenchUiState(
+    val selectedOperation: OperationKind = OperationKind.TEXT_GEN,
+    val statusMessage: String = "準備完了",
+    val generatedPrompt: String = "",
+    val aiOutput: String = "",
+    val lastSaveResult: SaveResult? = null,
+    val isLoading: Boolean = false,
+    // 入力データ
+    val inputSourceText: String = "",
+    val inputTopic: String = "",
+    val inputContext: String = "",
+    val inputPersonaId: Long? = null,
+    val targetLength: String = "中",
+    val customInstructions: String = ""
+)
 
 @HiltViewModel
 class WorkbenchViewModel @Inject constructor(
-    private val repository: DataRepository
+    private val workDao: WorkDao
 ) : ViewModel() {
 
-    // 作業台の現在のコンテンツ
-    private val _currentContent = MutableStateFlow("")
-    val currentContent: StateFlow<String> = _currentContent.asStateFlow()
+    private val _uiState = MutableStateFlow(WorkbenchUiState())
+    val uiState: StateFlow<WorkbenchUiState> = _uiState.asStateFlow()
 
-    // 選択中の作品ID
-    private val _selectedWorkId = MutableStateFlow<Long?>(null)
-    val selectedWorkId: StateFlow<Long?> = _selectedWorkId.asStateFlow()
-
-    // 最近使った作品リスト
-    private val _recentWorks = MutableStateFlow<List<Work>>(emptyList())
-    val recentWorks: StateFlow<List<Work>> = _recentWorks.asStateFlow()
-
-    init {
-        loadRecentWorks()
+    fun updateOperation(operation: OperationKind) {
+        _uiState.update { it.copy(selectedOperation = operation, generatedPrompt = "", lastSaveResult = null) }
     }
 
-    private fun loadRecentWorks() {
-        viewModelScope.launch {
-            _recentWorks.value = repository.getRecentWorks(10)
+    fun updateInputSourceText(text: String) { _uiState.update { it.copy(inputSourceText = text) } }
+    fun updateInputTopic(text: String) { _uiState.update { it.copy(inputTopic = text) } }
+    fun updateInputContext(text: String) { _uiState.update { it.copy(inputContext = text) } }
+    fun updateTargetLength(length: String) { _uiState.update { it.copy(targetLength = length) } }
+    fun updateCustomInstructions(text: String) { _uiState.update { it.copy(customInstructions = text) } }
+
+    fun validateInput(): String? {
+        val state = _uiState.value
+        return when (state.selectedOperation) {
+            OperationKind.TEXT_GEN -> if (state.inputTopic.isBlank()) "トピックを入力してください" else null
+            OperationKind.REVISION_FULL -> if (state.inputSourceText.isBlank()) "元の文章を入力してください" else null
+            else -> null
         }
     }
 
-    // データ管理画面から作品を読み込む
-    fun loadWork(workId: Long) {
+    fun generatePrompt() {
+        val state = _uiState.value
+        val prompt = buildString {
+            append("あなたは優秀なライティングアシスタントです。\n")
+            append("指示: ${state.selectedOperation.displayName}\n")
+            when (state.selectedOperation) {
+                OperationKind.TEXT_GEN -> append("トピック: ${state.inputTopic}\n")
+                OperationKind.REVISION_FULL -> append("原文: ${state.inputSourceText}\n")
+                else -> {}
+            }
+            if (state.customInstructions.isNotBlank()) {
+                append("追加指示: ${state.customInstructions}\n")
+            }
+            append("\n出力は以下のJSON形式でお願いします:\n")
+            append("{\"title\": \"...\", \"body\": \"...\"}")
+        }
+        _uiState.update { it.copy(generatedPrompt = prompt, statusMessage = "プロンプトを生成しました") }
+    }
+
+    fun updateAiOutput(output: String) {
+        _uiState.update { it.copy(aiOutput = output) }
+    }
+
+    fun parseAndSaveOutput() {
+        val output = _uiState.value.aiOutput
         viewModelScope.launch {
-            repository.getWorkById(workId)?.let { work ->
-                _currentContent.value = work.bodyText ?: ""
-                _selectedWorkId.value = work.id
+            try {
+                // 簡易的なパース（実際にはJSONパーサーを使用することを推奨）
+                val work = Work(
+                    kind = _uiState.value.selectedOperation.name,
+                    title = "AI生成作品",
+                    bodyText = output,
+                    createdAt = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                )
+                workDao.insert(work)
+                _uiState.update { it.copy(lastSaveResult = SaveResult.Success(1, "作品"), statusMessage = "保存しました") }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(lastSaveResult = SaveResult.Error("保存に失敗しました: ${e.message}")) }
             }
         }
     }
 
-    // 現在の内容を新しい作品として保存
-    fun saveAsNewWork(title: String, kind: String, writerName: String? = null) {
-        viewModelScope.launch {
-            val work = Work(
-                kind = kind,
-                title = title,
-                bodyText = _currentContent.value,
-                createdAt = java.time.Instant.now().toString(),
-                runLogId = null,
-                writerName = writerName,
-                readerNote = null,
-                toneLabel = null
-            )
-            val newId = repository.insertWork(work)
-            _selectedWorkId.value = newId
-            loadRecentWorks()
-        }
-    }
-
-    // 既存の作品を更新
-    fun updateWork(work: Work) {
-        viewModelScope.launch {
-            val updated = work.copy(bodyText = _currentContent.value)
-            repository.insertWork(updated)
-        }
-    }
-
-    // コンテンツを更新
-    fun updateContent(content: String) {
-        _currentContent.value = content
-    }
-
-    // 作業台をクリア
-    fun clearWorkbench() {
-        _currentContent.value = ""
-        _selectedWorkId.value = null
-    }
-
-    // トピックから作業台に読み込む
-    fun loadFromTopic(topicId: Long) {
-        viewModelScope.launch {
-            // トピックの内容を作業台に展開
-            // 実装はアプリの要件に応じて
-        }
-    }
-
-    // ペルソナから作業台に読み込む
-    fun loadFromPersona(personaId: Long) {
-        viewModelScope.launch {
-            repository.getAllPersonas().first()
-                .find { it.id == personaId }
-                ?.let { persona ->
-                    val template = buildString {
-                        appendLine("# ${persona.name}")
-                        persona.location?.let { appendLine("場所: $it") }
-                        persona.bio?.let { appendLine("\n$it") }
-                        persona.style?.let { appendLine("\nスタイル: $it") }
-                    }
-                    _currentContent.value = template
-                }
-        }
-    }
+    // ナビゲーション用のダミー（MindsetLabViewModelとの互換性が必要な場合）
+    fun navigateTo(screen: WorkbenchScreenType) {}
 }
+
+enum class WorkbenchScreenType { HOME, SESSION, HISTORY, REVIEW }

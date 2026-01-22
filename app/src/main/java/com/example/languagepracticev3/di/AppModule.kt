@@ -1,4 +1,3 @@
-// app/src/main/java/com/example/languagepracticev3/di/AppModule.kt
 package com.example.languagepracticev3.di
 
 import android.content.Context

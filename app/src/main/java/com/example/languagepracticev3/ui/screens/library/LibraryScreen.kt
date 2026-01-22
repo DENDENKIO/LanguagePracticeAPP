@@ -126,10 +126,10 @@ private fun WorksList(
     ) {
         items(works) { work ->
             ListItem(
-                headlineContent = { Text(work.title.ifEmpty { "無題" }) },
+                headlineContent = { Text(work.title?.ifEmpty { "無題" } ?: "無題") },
                 supportingContent = {
                     Text(
-                        work.bodyText.take(50),
+                        (work.bodyText ?: "").take(50),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -171,10 +171,10 @@ private fun StudyCardsList(
     ) {
         items(cards) { card ->
             ListItem(
-                headlineContent = { Text(card.focus.ifEmpty { "学習カード #${card.id}" }) },
+                headlineContent = { Text(card.focus?.ifEmpty { "学習カード #${card.id}" } ?: "学習カード #${card.id}") },
                 supportingContent = {
                     Text(
-                        "レベル: ${card.level.ifEmpty { "未設定" }}",
+                        "レベル: ${card.level?.ifEmpty { "未設定" } ?: "未設定"}",
                         maxLines = 1
                     )
                 },
@@ -200,7 +200,7 @@ private fun WorkDetail(work: Work) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
-            work.title.ifEmpty { "無題" },
+            work.title?.ifEmpty { "無題" } ?: "無題",
             style = MaterialTheme.typography.headlineSmall
         )
 
@@ -211,12 +211,12 @@ private fun WorkDetail(work: Work) {
                 onClick = {},
                 label = { Text(work.kind.ifEmpty { "TEXT_GEN" }) }
             )
-            work.writerName.takeIf { it.isNotEmpty() }?.let {
+            work.writerName?.takeIf { it.isNotEmpty() }?.let {
                 AssistChip(onClick = {}, label = { Text(it) })
             }
         }
 
-        Divider()
+        HorizontalDivider()
 
         Text(
             "本文",
@@ -224,13 +224,13 @@ private fun WorkDetail(work: Work) {
         )
 
         Text(
-            work.bodyText,
+            work.bodyText ?: "",
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.weight(1f)
         )
 
-        work.readerNote.takeIf { it.isNotEmpty() }?.let {
-            Divider()
+        work.readerNote?.takeIf { it.isNotEmpty() }?.let {
+            HorizontalDivider()
             Text(
                 "読者像メモ",
                 style = MaterialTheme.typography.titleSmall
@@ -243,7 +243,7 @@ private fun WorkDetail(work: Work) {
         }
 
         Text(
-            "作成日: ${work.createdAt}",
+            "作成日: ${work.createdAt ?: "不明"}",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
