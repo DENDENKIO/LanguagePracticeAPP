@@ -16,14 +16,8 @@ data class RouteStep(
     val fixedTone: String? = null
 )
 
-// OperationKind は OperationKind.kt で定義済みのため削除
-
-enum class LengthProfile {
-    SHORT,
-    MEDIUM,
-    LONG,
-    VERY_LONG
-}
+// OperationKind は OperationKind.kt で定義済み
+// LengthProfile は LengthProfile.kt で定義済み
 
 class LpExecutionContext {
     val stepOutputs: MutableMap<Int, Map<String, String>> = mutableMapOf()

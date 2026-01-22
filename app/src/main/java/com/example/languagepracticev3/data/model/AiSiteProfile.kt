@@ -1,5 +1,5 @@
 // app/src/main/java/com/example/languagepracticev3/data/models/AiSiteProfile.kt
-package com.example.languagepracticev3.data.models
+package com.example.languagepracticev3.data.model
 
 data class AiSiteProfile(
     val id: String,

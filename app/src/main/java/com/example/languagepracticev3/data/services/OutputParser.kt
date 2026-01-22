@@ -1,7 +1,6 @@
-// app/src/main/java/com/example/languagepracticev3/data/services/OutputParser.kt
 package com.example.languagepracticev3.data.services
 
-import com.example.languagepracticev3.data.models.OperationKind
+import com.example.languagepracticev3.data.model.OperationKind  // models → model に修正
 
 class OutputParser {
 
