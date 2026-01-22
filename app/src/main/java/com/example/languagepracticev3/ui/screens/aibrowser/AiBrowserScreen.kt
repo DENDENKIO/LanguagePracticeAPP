@@ -18,7 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.example.languagepracticev3.data.models.AiSiteProfile
+import com.example.languagepracticev3.data.model.AiSiteProfile
 import com.example.languagepracticev3.data.services.PromptBuilder
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch

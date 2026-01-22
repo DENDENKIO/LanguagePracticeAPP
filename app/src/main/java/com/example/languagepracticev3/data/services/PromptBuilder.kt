@@ -1,8 +1,8 @@
 // app/src/main/java/com/example/languagepracticev3/data/services/PromptBuilder.kt
 package com.example.languagepracticev3.data.services
 
-import com.example.languagepracticev3.data.models.LengthProfile
-import com.example.languagepracticev3.data.models.OperationKind
+import com.example.languagepracticev3.data.model.LengthProfile
+import com.example.languagepracticev3.data.model.OperationKind
 import java.util.UUID
 
 /**

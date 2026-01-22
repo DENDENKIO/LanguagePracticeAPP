@@ -5,8 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.languagepracticev3.data.database.KvSettingDao
 import com.example.languagepracticev3.data.model.KvSetting
-import com.example.languagepracticev3.data.models.AiSiteCatalog
-import com.example.languagepracticev3.data.models.AiSiteProfile
+import com.example.languagepracticev3.data.model.AiSiteCatalog
+import com.example.languagepracticev3.data.model.AiSiteProfile
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

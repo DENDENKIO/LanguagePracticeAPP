@@ -1,4 +1,4 @@
-// app/src/main/java/com/example/languagepracticev3/data/models/AiSiteProfile.kt
+// app/src/main/java/com/example/languagepracticev3/data/model/AiSiteProfile.kt
 package com.example.languagepracticev3.data.model
 
 data class AiSiteProfile(
