@@ -5,7 +5,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -19,13 +18,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.languagepracticev3.data.model.AiSiteProfile
 import com.example.languagepracticev3.data.model.LengthProfile
 import com.example.languagepracticev3.data.model.OperationKind
 import com.example.languagepracticev3.ui.screens.aibrowser.AiBrowserScreen
 import com.example.languagepracticev3.viewmodel.SaveResult
 import com.example.languagepracticev3.viewmodel.WorkbenchViewModel
-// WorkbenchUiState import用（同じパッケージにない場合）
 import com.example.languagepracticev3.viewmodel.WorkbenchUiState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -39,12 +36,11 @@ fun WorkbenchScreen(
 
     var showPromptDialog by remember { mutableStateOf(false) }
     var showOutputDialog by remember { mutableStateOf(false) }
-    var showSiteSelector by remember { mutableStateOf(false) }
 
-    // AIブラウザ画面の表示
-    if (uiState.showAiBrowser && uiState.selectedAiSite != null) {
+    // AIブラウザ画面の表示（設定で保存されたAIサイトを使用）
+    if (uiState.showAiBrowser) {
         AiBrowserScreen(
-            siteProfile = uiState.selectedAiSite!!,
+            siteProfile = uiState.aiSiteProfile,
             prompt = uiState.generatedPrompt,
             onResultReceived = { result ->
                 viewModel.onAiResultReceived(result)
@@ -75,6 +71,36 @@ fun WorkbenchScreen(
             )
             IconButton(onClick = { viewModel.clearInputs() }) {
                 Icon(Icons.Default.Refresh, "クリア")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // 使用するAIサイト表示
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            )
+        ) {
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.Computer, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "使用AI: ${uiState.aiSiteProfile.name}",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                if (uiState.isAutoMode) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "(自動モード)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
         }
 
@@ -118,8 +144,7 @@ fun WorkbenchScreen(
             viewModel = viewModel,
             context = context,
             onShowPromptDialog = { showPromptDialog = true },
-            onShowOutputDialog = { showOutputDialog = true },
-            onShowSiteSelector = { showSiteSelector = true }
+            onShowOutputDialog = { showOutputDialog = true }
         )
 
         // 処理中インジケーター
@@ -163,18 +188,6 @@ fun WorkbenchScreen(
                 showOutputDialog = false
             },
             onDismiss = { showOutputDialog = false }
-        )
-    }
-
-    if (showSiteSelector) {
-        SiteSelectorDialog(
-            sites = viewModel.aiSiteProfiles,
-            onSelect = { site ->
-                viewModel.selectAiSite(site)
-                showSiteSelector = false
-                viewModel.openAiBrowser()
-            },
-            onDismiss = { showSiteSelector = false }
         )
     }
 }
@@ -504,7 +517,7 @@ private fun LengthSelector(
 }
 
 // ====================
-// アクションボタン群
+// アクションボタン群（AI選択を削除）
 // ====================
 @Composable
 private fun ActionButtons(
@@ -512,8 +525,7 @@ private fun ActionButtons(
     viewModel: WorkbenchViewModel,
     context: Context,
     onShowPromptDialog: () -> Unit,
-    onShowOutputDialog: () -> Unit,
-    onShowSiteSelector: () -> Unit
+    onShowOutputDialog: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         // プロンプト生成ボタン
@@ -535,7 +547,7 @@ private fun ActionButtons(
             Text("プロンプト生成")
         }
 
-        // AI画面へ送信ボタン（メイン機能）
+        // AI画面へ送信ボタン（設定で保存されたAIを使用）
         Button(
             onClick = {
                 val error = viewModel.validateInput()
@@ -543,7 +555,7 @@ private fun ActionButtons(
                     Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
                 } else {
                     viewModel.generatePrompt()
-                    onShowSiteSelector()
+                    viewModel.openAiBrowser()
                 }
             },
             modifier = Modifier.fillMaxWidth(),
@@ -677,34 +689,6 @@ private fun OutputDialog(
     )
 }
 
-@Composable
-private fun SiteSelectorDialog(
-    sites: List<AiSiteProfile>,
-    onSelect: (AiSiteProfile) -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("AIサイトを選択") },
-        text = {
-            Column {
-                sites.forEach { site ->
-                    ListItem(
-                        headlineContent = { Text(site.name) },
-                        supportingContent = { Text(site.url, style = MaterialTheme.typography.bodySmall) },
-                        modifier = Modifier.clickable { onSelect(site) }
-                    )
-                    HorizontalDivider()
-                }
-            }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("キャンセル") }
-        }
-    )
-}
-
 // ====================
 // ヘルパー
 // ====================
@@ -726,5 +710,3 @@ private fun copyToClipboard(context: Context, text: String) {
     clipboard.setPrimaryClip(ClipData.newPlainText("prompt", text))
     Toast.makeText(context, "コピーしました", Toast.LENGTH_SHORT).show()
 }
-
-

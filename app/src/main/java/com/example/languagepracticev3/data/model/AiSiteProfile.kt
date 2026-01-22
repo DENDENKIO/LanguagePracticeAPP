@@ -6,7 +6,7 @@ import androidx.room.PrimaryKey
 
 /**
  * AIサイトのプロファイル
- * WPF版 AiSiteCatalog.cs をKotlinに移植
+ * 参考: WPF版 Services/AiSiteCatalog.cs
  */
 @Entity(tableName = "ai_site_profile")
 data class AiSiteProfile(
@@ -20,6 +20,7 @@ data class AiSiteProfile(
 
 /**
  * AIサイトカタログ（プリセット）
+ * 参考ソフトと同じ定義
  */
 object AiSiteCatalog {
     val Presets: List<AiSiteProfile> = listOf(

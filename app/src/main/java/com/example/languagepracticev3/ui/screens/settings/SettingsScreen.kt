@@ -1,18 +1,24 @@
 // app/src/main/java/com/example/languagepracticev3/ui/screens/settings/SettingsScreen.kt
 package com.example.languagepracticev3.ui.screens.settings
 
+import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.languagepracticev3.viewmodel.SettingsViewModel
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -25,15 +31,32 @@ fun SettingsScreen(
     val customAiSiteUrl by viewModel.customAiSiteUrl.collectAsState()
     val isAutoMode by viewModel.isAutoMode.collectAsState()
     val statusMessage by viewModel.statusMessage.collectAsState()
+    val isProcessing by viewModel.isProcessing.collectAsState()
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollState = rememberScrollState()
+    val context = LocalContext.current
 
     var aiSiteDropdownExpanded by remember { mutableStateOf(false) }
+    var showClearDataDialog by remember { mutableStateOf(false) }
 
     // 選択中のサイトプロファイル
     val selectedProfile = viewModel.aiSitePresets.find { it.id == selectedAiSiteId }
         ?: viewModel.aiSitePresets.first()
+
+    // バックアップ用ファイル選択
+    val backupLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/octet-stream")
+    ) { uri ->
+        uri?.let { viewModel.backupDatabase(it) }
+    }
+
+    // 復元用ファイル選択
+    val restoreLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let { viewModel.restoreDatabase(it) }
+    }
 
     LaunchedEffect(statusMessage) {
         if (statusMessage.isNotEmpty()) {
@@ -196,17 +219,91 @@ fun SettingsScreen(
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Text(
-                                    "このサイトは自動送信が不安定な場合があります。手動操作をお勧めします。",
+                                    viewModel.autoModeHint,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onErrorContainer
                                 )
                             }
                         }
                     }
+                }
+            }
 
-                    // ヘルプテキスト
+            // データ管理カード
+            Card(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     Text(
-                        "※ Genspark・Perplexityは自動送信に対応しています。Google AIやChatGPTはログインが必要なため手動操作を推奨します。",
+                        "データ管理",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+
+                    // データベース情報
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            "データベースサイズ",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            viewModel.getDatabaseSize(),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    HorizontalDivider()
+
+                    // バックアップボタン
+                    OutlinedButton(
+                        onClick = {
+                            val timestamp = LocalDateTime.now()
+                                .format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmm"))
+                            backupLauncher.launch("LanguagePractice_Backup_$timestamp.db")
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isProcessing
+                    ) {
+                        Icon(Icons.Default.Backup, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("バックアップを作成")
+                    }
+
+                    // 復元ボタン
+                    OutlinedButton(
+                        onClick = {
+                            restoreLauncher.launch(arrayOf("application/octet-stream", "*/*"))
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isProcessing
+                    ) {
+                        Icon(Icons.Default.Restore, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("バックアップから復元")
+                    }
+
+                    // 処理中インジケーター
+                    if (isProcessing) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("処理中...")
+                        }
+                    }
+
+                    // 注意書き
+                    Text(
+                        "※復元後はアプリを再起動してください",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -215,11 +312,12 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.weight(1f))
 
+            // 保存ボタン
             Button(
                 onClick = viewModel::saveSettings,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("保存")
+                Text("設定を保存")
             }
         }
     }

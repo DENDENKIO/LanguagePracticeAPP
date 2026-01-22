@@ -23,7 +23,7 @@ sealed class SaveResult {
     data class Error(val message: String) : SaveResult()
 }
 
-// UI状態
+// UI状態（AI選択関連を削除）
 data class WorkbenchUiState(
     val selectedOperation: OperationKind = OperationKind.TEXT_GEN,
     val inputTopic: String = "",
@@ -47,7 +47,9 @@ data class WorkbenchUiState(
     val lastSaveResult: SaveResult? = null,
     val isProcessing: Boolean = false,
     val showAiBrowser: Boolean = false,
-    val selectedAiSite: AiSiteProfile? = null
+    // 設定から読み込んだAIサイト情報
+    val aiSiteProfile: AiSiteProfile = AiSiteCatalog.Presets[0],
+    val isAutoMode: Boolean = false
 )
 
 @HiltViewModel
@@ -66,6 +68,35 @@ class WorkbenchViewModel @Inject constructor(
 
     private val promptBuilder = PromptBuilder()
     private val outputParser = OutputParser()
+
+    init {
+        loadAiSettings()
+    }
+
+    /**
+     * 設定画面で保存されたAI設定を読み込む
+     */
+    private fun loadAiSettings() {
+        viewModelScope.launch {
+            val siteId = kvSettingDao.get("ai_site_id")?.value ?: "GENSPARK"
+            val customUrl = kvSettingDao.get("ai_site_url")?.value
+            val isAutoMode = kvSettingDao.get("auto_mode")?.value?.toBooleanStrictOrNull() ?: false
+
+            val preset = AiSiteCatalog.getByIdOrDefault(siteId)
+            val profile = if (!customUrl.isNullOrBlank()) {
+                preset.copy(url = customUrl)
+            } else {
+                preset
+            }
+
+            _uiState.update {
+                it.copy(
+                    aiSiteProfile = profile,
+                    isAutoMode = isAutoMode
+                )
+            }
+        }
+    }
 
     // ====================
     // 入力更新
@@ -90,21 +121,6 @@ class WorkbenchViewModel @Inject constructor(
     fun updateAiOutput(v: String) = _uiState.update { it.copy(aiOutput = v) }
 
     // ====================
-    // AIサイト選択
-    // ====================
-    val aiSiteProfiles = listOf(
-        AiSiteProfile("GENSPARK", "Genspark", "https://www.genspark.ai/"),
-        AiSiteProfile("PERPLEXITY", "Perplexity", "https://www.perplexity.ai/"),
-        AiSiteProfile("CHATGPT", "ChatGPT", "https://chat.openai.com/"),
-        AiSiteProfile("CLAUDE", "Claude", "https://claude.ai/"),
-        AiSiteProfile("GEMINI", "Gemini", "https://gemini.google.com/")
-    )
-
-    fun selectAiSite(site: AiSiteProfile) {
-        _uiState.update { it.copy(selectedAiSite = site) }
-    }
-
-    // ====================
     // 入力検証
     // ====================
     fun validateInput(): String? {
@@ -118,8 +134,8 @@ class WorkbenchViewModel @Inject constructor(
                 if (state.inputSourceText.isBlank()) "対象本文を入力してください"
                 else null
             }
-            OperationKind.PERSONA_GEN -> null // ジャンルは任意
-            OperationKind.TOPIC_GEN -> null // 画像URLは任意
+            OperationKind.PERSONA_GEN -> null
+            OperationKind.TOPIC_GEN -> null
             OperationKind.OBSERVE_IMAGE -> {
                 if (state.inputImageUrl.isBlank()) "画像URLを入力してください"
                 else null
@@ -151,7 +167,7 @@ class WorkbenchViewModel @Inject constructor(
     }
 
     // ====================
-    // プロンプト生成（★修正箇所）
+    // プロンプト生成
     // ====================
     fun generatePrompt() {
         val state = _uiState.value
@@ -159,12 +175,12 @@ class WorkbenchViewModel @Inject constructor(
             OperationKind.TEXT_GEN -> promptBuilder.buildTextGenPrompt(
                 writer = state.inputWriter,
                 topic = state.inputTopic,
-                reader = state.inputReader,  // ★修正: coreReader → reader
+                reader = state.inputReader,
                 tone = "",
                 length = state.selectedLength
             )
             OperationKind.STUDY_CARD -> promptBuilder.buildStudyCardPrompt(
-                reader = state.inputReader,  // ★修正: coreReader → reader
+                reader = state.inputReader,
                 tone = "",
                 sourceText = state.inputSourceText
             )
@@ -172,13 +188,13 @@ class WorkbenchViewModel @Inject constructor(
             OperationKind.TOPIC_GEN -> promptBuilder.buildTopicGenPrompt(state.inputImageUrl)
             OperationKind.OBSERVE_IMAGE -> promptBuilder.buildObserveImagePrompt(state.inputImageUrl)
             OperationKind.CORE_EXTRACT -> promptBuilder.buildCoreExtractPrompt(
-                reader = state.inputReader,  // ★修正: coreReader → reader
+                reader = state.inputReader,
                 sourceText = state.inputSourceText
             )
             OperationKind.GIKO -> promptBuilder.buildGikoPrompt(
                 toneLabel = state.inputToneLabel,
                 toneRule = state.inputToneRule,
-                reader = state.inputReader,  // ★修正: coreReader → reader
+                reader = state.inputReader,
                 topic = state.inputTopic,
                 sourceText = state.inputSourceText
             )
@@ -187,7 +203,7 @@ class WorkbenchViewModel @Inject constructor(
                 coreTheme = state.inputCoreTheme,
                 coreEmotion = state.inputCoreEmotion,
                 coreTakeaway = state.inputCoreTakeaway,
-                coreReader = state.inputReader,  // これは正しい（PromptBuilderの引数名がcoreReader）
+                coreReader = state.inputReader,
                 coreSentence = state.inputCoreSentence
             )
             OperationKind.PERSONA_VERIFY_ASSIST -> promptBuilder.buildPersonaVerifyPrompt(
@@ -206,7 +222,11 @@ class WorkbenchViewModel @Inject constructor(
     // AIブラウザ表示制御
     // ====================
     fun openAiBrowser() {
-        _uiState.update { it.copy(showAiBrowser = true) }
+        // AI設定を再読み込みしてからブラウザを開く
+        viewModelScope.launch {
+            loadAiSettings()
+            _uiState.update { it.copy(showAiBrowser = true) }
+        }
     }
 
     fun closeAiBrowser() {
@@ -225,7 +245,6 @@ class WorkbenchViewModel @Inject constructor(
                     isProcessing = true
                 )
             }
-            // 自動的に解析・保存
             parseAndSaveOutput()
         }
     }
@@ -250,7 +269,6 @@ class WorkbenchViewModel @Inject constructor(
             }
 
             try {
-                // 1. 実行ログを保存
                 val now = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
                 val runLog = RunLog(
                     operationKind = op.name,
@@ -262,7 +280,6 @@ class WorkbenchViewModel @Inject constructor(
                 )
                 val runLogId = runLogDao.insert(runLog)
 
-                // 2. 操作種別に応じて解析・保存
                 val result = when (op) {
                     OperationKind.TEXT_GEN -> saveTextGenResult(output, runLogId, now)
                     OperationKind.STUDY_CARD -> saveStudyCardResult(output, runLogId, now)
@@ -299,9 +316,7 @@ class WorkbenchViewModel @Inject constructor(
 
     private suspend fun saveTextGenResult(output: String, runLogId: Long, now: String): SaveResult {
         val parsed = outputParser.parseTextGenOutput(output)
-        if (parsed == null) {
-            return SaveResult.Error("テキスト生成結果の解析に失敗しました")
-        }
+            ?: return SaveResult.Error("テキスト生成結果の解析に失敗しました")
 
         val work = Work(
             kind = "TEXT_GEN",
@@ -319,9 +334,7 @@ class WorkbenchViewModel @Inject constructor(
 
     private suspend fun saveStudyCardResult(output: String, runLogId: Long, now: String): SaveResult {
         val parsed = outputParser.parseStudyCardOutput(output)
-        if (parsed == null) {
-            return SaveResult.Error("学習カードの解析に失敗しました")
-        }
+            ?: return SaveResult.Error("学習カードの解析に失敗しました")
 
         val card = StudyCard(
             sourceWorkId = null,
@@ -385,9 +398,7 @@ class WorkbenchViewModel @Inject constructor(
 
     private suspend fun saveObservationResult(output: String, now: String): SaveResult {
         val parsed = outputParser.parseObservationOutput(output)
-        if (parsed == null) {
-            return SaveResult.Error("観察ノートの解析に失敗しました")
-        }
+            ?: return SaveResult.Error("観察ノートの解析に失敗しました")
 
         val observation = Observation(
             imageUrl = _uiState.value.inputImageUrl,
@@ -405,9 +416,7 @@ class WorkbenchViewModel @Inject constructor(
 
     private suspend fun saveCoreExtractResult(output: String, runLogId: Long, now: String): SaveResult {
         val parsed = outputParser.parseCoreExtractOutput(output)
-        if (parsed == null) {
-            return SaveResult.Error("核抽出結果の解析に失敗しました")
-        }
+            ?: return SaveResult.Error("核抽出結果の解析に失敗しました")
 
         val work = Work(
             kind = "CORE_EXTRACT",
@@ -425,9 +434,7 @@ class WorkbenchViewModel @Inject constructor(
 
     private suspend fun saveGikoResult(output: String, runLogId: Long, now: String): SaveResult {
         val parsed = outputParser.parseGikoOutput(output)
-        if (parsed == null) {
-            return SaveResult.Error("擬古文の解析に失敗しました")
-        }
+            ?: return SaveResult.Error("擬古文の解析に失敗しました")
 
         val work = Work(
             kind = "GIKO",
