@@ -16,7 +16,8 @@ class PracticeViewModel @Inject constructor(
     private val practiceSessionDao: PracticeSessionDao
 ) : ViewModel() {
 
-    val sessions: StateFlow<List<PracticeSession>> = practiceSessionDao.getAll()
+    // ★修正: getAll() → observeAll() に変更（FlowをStateFlowに変換）
+    val sessions: StateFlow<List<PracticeSession>> = practiceSessionDao.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _currentSession = MutableStateFlow<PracticeSession?>(null)

@@ -24,7 +24,8 @@ class RouteViewModel @Inject constructor(
 
     private val gson = Gson()
 
-    val customRoutes: StateFlow<List<CustomRoute>> = customRouteDao.getAll()
+    // ★修正: getAll() → observeAll() に変更（FlowをStateFlowに変換）
+    val customRoutes: StateFlow<List<CustomRoute>> = customRouteDao.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _selectedRoute = MutableStateFlow<RouteDefinition?>(null)
