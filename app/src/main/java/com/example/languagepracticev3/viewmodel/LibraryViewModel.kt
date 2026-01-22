@@ -2,154 +2,159 @@ package com.example.languagepracticev3.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.languagepracticev3.data.database.MindsetLabDao
+import com.example.languagepracticev3.data.database.*
 import com.example.languagepracticev3.data.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
-@HiltViewModel
-class MindsetLabViewModel @Inject constructor(
-    private val mindsetLabDao: MindsetLabDao
-) : ViewModel() {
+data class LibraryUiState(
+    val works: List<Work> = emptyList(),
+    val studyCards: List<StudyCard> = emptyList(),
+    val personas: List<Persona> = emptyList(),
+    val topics: List<Topic> = emptyList(),
+    val observations: List<Observation> = emptyList(),
+    val searchKeyword: String = "",
+    val selectedTab: LibraryTab = LibraryTab.WORKS,
+    val isLoading: Boolean = false
+)
 
-    val days: StateFlow<List<MsDay>> = mindsetLabDao.getAllDays()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    private val _selectedDay = MutableStateFlow<MsDay?>(null)
-    val selectedDay: StateFlow<MsDay?> = _selectedDay.asStateFlow()
-
-    val currentDayEntries: StateFlow<List<MsEntry>> = _selectedDay
-        .flatMapLatest { day ->
-            day?.let { mindsetLabDao.getEntriesByDay(it.id) } ?: flowOf(emptyList())
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    private val _currentScreen = MutableStateFlow(MindsetLabScreen.HOME)
-    val currentScreen: StateFlow<MindsetLabScreen> = _currentScreen.asStateFlow()
-
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
-
-    // Set<Int> から List<Int> に変更
-    private val _selectedMindsets = MutableStateFlow<List<Int>>(emptyList())
-    val selectedMindsets: StateFlow<List<Int>> = _selectedMindsets.asStateFlow()
-
-    private val _scene = MutableStateFlow("")
-    val scene: StateFlow<String> = _scene.asStateFlow()
-
-    val availableMindsets: List<MindsetInfo> = MindsetDefinitions.all.values.toList()
-
-    fun navigateTo(screen: MindsetLabScreen) {
-        _currentScreen.value = screen
-    }
-
-    fun selectDay(day: MsDay?) {
-        _selectedDay.value = day
-        if (day != null) {
-            _currentScreen.value = MindsetLabScreen.SESSION
-        }
-    }
-
-    fun createNewDay() {
-        viewModelScope.launch {
-            val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
-            val day = MsDay(
-                dateKey = today,
-                focusMindsets = _selectedMindsets.value.joinToString(","),
-                scene = _scene.value,
-                createdAt = today
-            )
-            val id = mindsetLabDao.insertDay(day)
-            selectDay(day.copy(id = id))
-        }
-    }
-
-    fun addEntry(entryType: String, bodyText: String) {
-        viewModelScope.launch {
-            _selectedDay.value?.let { day ->
-                val now = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
-                val entry = MsEntry(
-                    dayId = day.id,
-                    entryType = entryType,
-                    bodyText = bodyText,
-                    createdAt = now
-                )
-                mindsetLabDao.insertEntry(entry)
-            }
-        }
-    }
-
-    fun deleteDay(day: MsDay) {
-        viewModelScope.launch {
-            mindsetLabDao.deleteDay(day)
-            if (_selectedDay.value?.id == day.id) {
-                _selectedDay.value = null
-                _currentScreen.value = MindsetLabScreen.HOME
-            }
-        }
-    }
-
-    fun toggleMindset(id: Int) {
-        val current = _selectedMindsets.value
-        _selectedMindsets.value = if (current.contains(id)) {
-            current - id
-        } else {
-            if (current.size < 3) {
-                current + id
-            } else {
-                current // 最大3つまで
-            }
-        }
-    }
-
-    fun updateScene(newScene: String) {
-        _scene.value = newScene
-    }
-
-    fun createOrUpdateToday() {
-        createNewDay()
-    }
-
-    fun saveEntry(type: String, body: String) = addEntry(type, body)
-
-    // 引数を2つ受け取るように変更
-    fun updateEntry(entry: MsEntry, newText: String) {
-        viewModelScope.launch {
-            val updated = entry.copy(bodyText = newText)
-            mindsetLabDao.updateEntry(updated)
-        }
-    }
-
-    fun deleteEntry(entry: MsEntry) {
-        viewModelScope.launch {
-            mindsetLabDao.deleteEntry(entry)
-        }
-    }
-
-    fun getDrillsForSelectedMindsets(): List<DrillDef> {
-        return _selectedMindsets.value.flatMap { MindsetDefinitions.getDrillsByMindset(it) }
-    }
-
-    fun goBack() {
-        when (_currentScreen.value) {
-            MindsetLabScreen.SESSION -> {
-                _selectedDay.value = null
-                _currentScreen.value = MindsetLabScreen.HOME
-            }
-            MindsetLabScreen.HISTORY -> _currentScreen.value = MindsetLabScreen.HOME
-            MindsetLabScreen.REVIEW -> _currentScreen.value = MindsetLabScreen.HOME
-            else -> {}
-        }
-    }
+enum class LibraryTab {
+    WORKS,
+    STUDY_CARDS,
+    PERSONAS,
+    TOPICS,
+    OBSERVATIONS
 }
 
-enum class MindsetLabScreen {
-    HOME,
-    SESSION,
-    HISTORY,
-    REVIEW
+@HiltViewModel
+class LibraryViewModel @Inject constructor(
+    private val workDao: WorkDao,
+    private val studyCardDao: StudyCardDao,
+    private val personaDao: PersonaDao,
+    private val topicDao: TopicDao,
+    private val observationDao: ObservationDao
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(LibraryUiState())
+    val uiState: StateFlow<LibraryUiState> = _uiState.asStateFlow()
+
+    private val _searchKeyword = MutableStateFlow("")
+
+    init {
+        loadAllData()
+
+        // 検索キーワードの変更を監視
+        viewModelScope.launch {
+            _searchKeyword
+                .debounce(300)
+                .collectLatest { keyword ->
+                    if (keyword.isBlank()) {
+                        loadAllData()
+                    } else {
+                        searchData(keyword)
+                    }
+                }
+        }
+    }
+
+    private fun loadAllData() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+
+            combine(
+                workDao.observeAll(),
+                studyCardDao.observeAll(),
+                personaDao.observeAll(),
+                topicDao.observeAll(),
+                observationDao.observeAll()
+            ) { works, studyCards, personas, topics, observations ->
+                LibraryUiState(
+                    works = works,
+                    studyCards = studyCards,
+                    personas = personas,
+                    topics = topics,
+                    observations = observations,
+                    searchKeyword = _searchKeyword.value,
+                    selectedTab = _uiState.value.selectedTab,
+                    isLoading = false
+                )
+            }.collect { state ->
+                _uiState.value = state
+            }
+        }
+    }
+
+    private fun searchData(keyword: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+
+            combine(
+                workDao.search(keyword),
+                studyCardDao.search(keyword),
+                personaDao.search(keyword),
+                topicDao.search(keyword),
+                observationDao.search(keyword)
+            ) { works, studyCards, personas, topics, observations ->
+                _uiState.value.copy(
+                    works = works,
+                    studyCards = studyCards,
+                    personas = personas,
+                    topics = topics,
+                    observations = observations,
+                    isLoading = false
+                )
+            }.collect { state ->
+                _uiState.value = state
+            }
+        }
+    }
+
+    fun updateSearchKeyword(keyword: String) {
+        _searchKeyword.value = keyword
+        _uiState.update { it.copy(searchKeyword = keyword) }
+    }
+
+    fun selectTab(tab: LibraryTab) {
+        _uiState.update { it.copy(selectedTab = tab) }
+    }
+
+    fun deleteWork(work: Work) {
+        viewModelScope.launch {
+            workDao.delete(work)
+        }
+    }
+
+    fun deleteStudyCard(card: StudyCard) {
+        viewModelScope.launch {
+            studyCardDao.delete(card)
+        }
+    }
+
+    fun deletePersona(persona: Persona) {
+        viewModelScope.launch {
+            personaDao.delete(persona)
+        }
+    }
+
+    fun deleteTopic(topic: Topic) {
+        viewModelScope.launch {
+            topicDao.delete(topic)
+        }
+    }
+
+    fun deleteObservation(observation: Observation) {
+        viewModelScope.launch {
+            observationDao.delete(observation)
+        }
+    }
+
+    fun refresh() {
+        if (_searchKeyword.value.isBlank()) {
+            loadAllData()
+        } else {
+            searchData(_searchKeyword.value)
+        }
+    }
 }
