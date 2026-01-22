@@ -16,16 +16,7 @@ data class RouteStep(
     val fixedTone: String? = null
 )
 
-enum class OperationKind {
-    TEXT_GEN,
-    GIKO,
-    ANALYZE,
-    COMPARE,
-    OBSERVE,
-    POETRY_DRAFT,
-    POETRY_CORE,
-    POETRY_REV
-}
+// OperationKind は OperationKind.kt で定義済みのため削除
 
 enum class LengthProfile {
     SHORT,

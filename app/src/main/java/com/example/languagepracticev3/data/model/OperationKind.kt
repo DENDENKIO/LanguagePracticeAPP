@@ -1,6 +1,7 @@
 package com.example.languagepracticev3.data.model
 
 enum class OperationKind(val displayName: String, val description: String) {
+    // 基本操作
     READER_AUTO_GEN("読者像生成", "読者像（READER）を自動で1つ提案します（文章生成の前準備用）"),
     TOPIC_GEN("お題生成", "詳細なお題を複数生成します"),
     PERSONA_GEN("ペルソナ生成", "実在人物ベースの書き手像を生成します"),
@@ -10,5 +11,13 @@ enum class OperationKind(val displayName: String, val description: String) {
     CORE_EXTRACT("核抽出", "本文の核（テーマ/感情/持ち帰り/核の一文）を抽出します"),
     REVISION_FULL("全文推敲", "核を不変条件にして全文推敲（複数案）を作ります"),
     GIKO("擬古文変換", "現代文を指定文調（平安風、漢文調など）に書き換えます"),
-    PERSONA_VERIFY_ASSIST("ペルソナ検証", "人物プロフィールの根拠テキストをもとに矛盾/支持を整理します")
+    PERSONA_VERIFY_ASSIST("ペルソナ検証", "人物プロフィールの根拠テキストをもとに矛盾/支持を整理します"),
+
+    // RouteModels用の追加操作
+    ANALYZE("分析", "テキストを分析します"),
+    COMPARE("比較", "複数のテキストを比較します"),
+    OBSERVE("観察", "対象を観察してノートを作成します"),
+    POETRY_DRAFT("詩の下書き", "詩の初稿を作成します"),
+    POETRY_CORE("詩の核抽出", "詩の核となる要素を抽出します"),
+    POETRY_REV("詩の推敲", "詩を推敲します")
 }
