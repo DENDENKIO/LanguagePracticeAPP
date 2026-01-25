@@ -1,3 +1,4 @@
+// app/src/main/java/com/example/languagepracticev3/data/repository/DataRepository.kt
 package com.example.languagepracticev3.data.repository
 
 import com.example.languagepracticev3.data.database.*
@@ -19,7 +20,11 @@ class DataRepository @Inject constructor(
     private val practiceSessionDao: PracticeSessionDao,
     private val compareDao: CompareDao,
     private val experimentDao: ExperimentDao,
-    private val globalRevisionSessionDao: GlobalRevisionSessionDao  // ★追加
+    private val globalRevisionSessionDao: GlobalRevisionSessionDao,
+    // ★追加: 6つの思考習慣
+    private val sixHabitsSessionDao: SixHabitsSessionDao,
+    private val sixHabitsDailyTrackingDao: SixHabitsDailyTrackingDao,
+    private val sixHabitsMaterialDao: SixHabitsMaterialDao
 ) {
     // Work
     suspend fun insertWork(work: Work): Long = workDao.insert(work)
@@ -50,7 +55,7 @@ class DataRepository @Inject constructor(
     fun getAllCustomRoutes(): Flow<List<CustomRoute>> = customRouteDao.observeAll()
 
     // =====================================
-    // ★追加: グローバル・リビジョンセッション
+    // グローバル・リビジョンセッション
     // =====================================
     fun getAllGlobalRevisionSessions(): Flow<List<GlobalRevisionSession>> {
         return globalRevisionSessionDao.observeAll()
@@ -71,5 +76,87 @@ class DataRepository @Inject constructor(
 
     suspend fun getGlobalRevisionSessionById(id: Long): GlobalRevisionSession? {
         return globalRevisionSessionDao.getById(id)
+    }
+
+    // =====================================
+    // ★追加: 6つの思考習慣
+    // =====================================
+
+    // Session
+    fun getAllSixHabitsSessions(): Flow<List<SixHabitsSession>> {
+        return sixHabitsSessionDao.observeAll()
+    }
+
+    fun getSixHabitsSessionsByMindsetType(mindsetType: Int): Flow<List<SixHabitsSession>> {
+        return sixHabitsSessionDao.observeByMindsetType(mindsetType)
+    }
+
+    suspend fun saveSixHabitsSession(session: SixHabitsSession): Long {
+        return if (session.id == 0L) {
+            sixHabitsSessionDao.insert(session)
+        } else {
+            sixHabitsSessionDao.update(session)
+            session.id
+        }
+    }
+
+    suspend fun deleteSixHabitsSession(session: SixHabitsSession) {
+        sixHabitsSessionDao.delete(session)
+    }
+
+    suspend fun getSixHabitsSessionById(id: Long): SixHabitsSession? {
+        return sixHabitsSessionDao.getById(id)
+    }
+
+    // Daily Tracking
+    fun getAllSixHabitsDailyTracking(): Flow<List<SixHabitsDailyTracking>> {
+        return sixHabitsDailyTrackingDao.observeAll()
+    }
+
+    suspend fun getSixHabitsDailyTrackingByDate(date: String): SixHabitsDailyTracking? {
+        return sixHabitsDailyTrackingDao.getByDate(date)
+    }
+
+    suspend fun saveSixHabitsDailyTracking(tracking: SixHabitsDailyTracking): Long {
+        return if (tracking.id == 0L) {
+            sixHabitsDailyTrackingDao.insert(tracking)
+        } else {
+            sixHabitsDailyTrackingDao.update(tracking)
+            tracking.id
+        }
+    }
+
+    suspend fun getRecentSixHabitsDailyTracking(limit: Int): List<SixHabitsDailyTracking> {
+        return sixHabitsDailyTrackingDao.getRecent(limit)
+    }
+
+    // Materials
+    fun getAllSixHabitsMaterials(): Flow<List<SixHabitsMaterial>> {
+        return sixHabitsMaterialDao.observeAll()
+    }
+
+    fun getSixHabitsMaterialsByType(type: String): Flow<List<SixHabitsMaterial>> {
+        return sixHabitsMaterialDao.observeByType(type)
+    }
+
+    fun getFavoriteSixHabitsMaterials(): Flow<List<SixHabitsMaterial>> {
+        return sixHabitsMaterialDao.observeFavorites()
+    }
+
+    suspend fun saveSixHabitsMaterial(material: SixHabitsMaterial): Long {
+        return if (material.id == 0L) {
+            sixHabitsMaterialDao.insert(material)
+        } else {
+            sixHabitsMaterialDao.update(material)
+            material.id
+        }
+    }
+
+    suspend fun deleteSixHabitsMaterial(material: SixHabitsMaterial) {
+        sixHabitsMaterialDao.delete(material)
+    }
+
+    suspend fun countSixHabitsMaterialsByType(type: String): Int {
+        return sixHabitsMaterialDao.countByType(type)
     }
 }

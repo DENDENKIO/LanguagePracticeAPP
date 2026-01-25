@@ -1,3 +1,4 @@
+// app/src/main/java/com/example/languagepracticev3/data/database/AppDatabase.kt
 package com.example.languagepracticev3.data.database
 
 import android.content.Context
@@ -34,9 +35,13 @@ import com.example.languagepracticev3.data.model.*
         MsAiStepLog::class,
         MsReview::class,
         MsExportLog::class,
-        GlobalRevisionSession::class  // ★追加
+        GlobalRevisionSession::class,
+        // ★追加: 6つの思考習慣
+        SixHabitsSession::class,
+        SixHabitsDailyTracking::class,
+        SixHabitsMaterial::class
     ],
-    version = 3,  // ★バージョンをインクリメント
+    version = 4,  // ★バージョンをインクリメント（3→4）
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -53,7 +58,11 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun experimentDao(): ExperimentDao
     abstract fun poetryLabDao(): PoetryLabDao
     abstract fun mindsetLabDao(): MindsetLabDao
-    abstract fun globalRevisionSessionDao(): GlobalRevisionSessionDao  // ★追加
+    abstract fun globalRevisionSessionDao(): GlobalRevisionSessionDao
+    // ★追加: 6つの思考習慣
+    abstract fun sixHabitsSessionDao(): SixHabitsSessionDao
+    abstract fun sixHabitsDailyTrackingDao(): SixHabitsDailyTrackingDao
+    abstract fun sixHabitsMaterialDao(): SixHabitsMaterialDao
 
     companion object {
         @Volatile

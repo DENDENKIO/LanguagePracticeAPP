@@ -1,3 +1,4 @@
+// app/src/main/java/com/example/languagepracticev3/di/AppModule.kt
 package com.example.languagepracticev3.di
 
 import android.content.Context
@@ -84,9 +85,24 @@ object AppModule {
         return database.mindsetLabDao()
     }
 
-    // ★追加
     @Provides
     fun provideGlobalRevisionSessionDao(database: AppDatabase): GlobalRevisionSessionDao {
         return database.globalRevisionSessionDao()
+    }
+
+    // ★追加: 6つの思考習慣
+    @Provides
+    fun provideSixHabitsSessionDao(database: AppDatabase): SixHabitsSessionDao {
+        return database.sixHabitsSessionDao()
+    }
+
+    @Provides
+    fun provideSixHabitsDailyTrackingDao(database: AppDatabase): SixHabitsDailyTrackingDao {
+        return database.sixHabitsDailyTrackingDao()
+    }
+
+    @Provides
+    fun provideSixHabitsMaterialDao(database: AppDatabase): SixHabitsMaterialDao {
+        return database.sixHabitsMaterialDao()
     }
 }

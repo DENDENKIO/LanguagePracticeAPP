@@ -5,7 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.languagepracticev3.data.model.GlobalRevisionSession
 import com.example.languagepracticev3.data.model.GlobalRevisionStep
-import com.example.languagepracticev3.data.repository.DataRepository  // ★修正: AppRepository → DataRepository
+import com.example.languagepracticev3.data.repository.DataRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,7 +21,8 @@ import javax.inject.Inject
  */
 enum class SelfQuestioningMode {
     NONE,
-    GLOBAL_REVISION
+    GLOBAL_REVISION,
+    SIX_HABITS  // ★追加
 }
 
 /**
@@ -61,7 +62,7 @@ data class SelfQuestioningUiState(
 
 @HiltViewModel
 class SelfQuestioningViewModel @Inject constructor(
-    private val repository: DataRepository  // ★修正
+    private val repository: DataRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SelfQuestioningUiState())
@@ -80,6 +81,7 @@ class SelfQuestioningViewModel @Inject constructor(
         if (mode == SelfQuestioningMode.GLOBAL_REVISION) {
             loadSessions()
         }
+        // ★ SIX_HABITS モードの場合は、別のViewModelで処理
     }
 
     fun clearMode() {

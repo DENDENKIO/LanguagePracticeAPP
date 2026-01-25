@@ -470,3 +470,81 @@ interface GlobalRevisionSessionDao {
     suspend fun deleteAll()
 }
 
+// ========== 6つの思考習慣 DAO ==========
+// 以下を Daos.kt の末尾に追加
+
+@Dao
+interface SixHabitsSessionDao {
+    @Query("SELECT * FROM six_habits_sessions ORDER BY updatedAt DESC")
+    fun observeAll(): Flow<List<SixHabitsSession>>
+
+    @Query("SELECT * FROM six_habits_sessions WHERE mindsetType = :mindsetType ORDER BY updatedAt DESC")
+    fun observeByMindsetType(mindsetType: Int): Flow<List<SixHabitsSession>>
+
+    @Query("SELECT * FROM six_habits_sessions WHERE id = :id")
+    suspend fun getById(id: Long): SixHabitsSession?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(session: SixHabitsSession): Long
+
+    @Update
+    suspend fun update(session: SixHabitsSession)
+
+    @Delete
+    suspend fun delete(session: SixHabitsSession)
+
+    @Query("DELETE FROM six_habits_sessions")
+    suspend fun deleteAll()
+
+    @Query("SELECT * FROM six_habits_sessions WHERE sessionDate = :date")
+    suspend fun getByDate(date: String): List<SixHabitsSession>
+}
+
+@Dao
+interface SixHabitsDailyTrackingDao {
+    @Query("SELECT * FROM six_habits_daily_tracking ORDER BY date DESC")
+    fun observeAll(): Flow<List<SixHabitsDailyTracking>>
+
+    @Query("SELECT * FROM six_habits_daily_tracking WHERE date = :date")
+    suspend fun getByDate(date: String): SixHabitsDailyTracking?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(tracking: SixHabitsDailyTracking): Long
+
+    @Update
+    suspend fun update(tracking: SixHabitsDailyTracking)
+
+    @Delete
+    suspend fun delete(tracking: SixHabitsDailyTracking)
+
+    @Query("SELECT * FROM six_habits_daily_tracking ORDER BY date DESC LIMIT :limit")
+    suspend fun getRecent(limit: Int): List<SixHabitsDailyTracking>
+}
+
+@Dao
+interface SixHabitsMaterialDao {
+    @Query("SELECT * FROM six_habits_materials ORDER BY createdAt DESC")
+    fun observeAll(): Flow<List<SixHabitsMaterial>>
+
+    @Query("SELECT * FROM six_habits_materials WHERE materialType = :type ORDER BY createdAt DESC")
+    fun observeByType(type: String): Flow<List<SixHabitsMaterial>>
+
+    @Query("SELECT * FROM six_habits_materials WHERE isFavorite = 1 ORDER BY createdAt DESC")
+    fun observeFavorites(): Flow<List<SixHabitsMaterial>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(material: SixHabitsMaterial): Long
+
+    @Update
+    suspend fun update(material: SixHabitsMaterial)
+
+    @Delete
+    suspend fun delete(material: SixHabitsMaterial)
+
+    @Query("SELECT * FROM six_habits_materials WHERE id = :id")
+    suspend fun getById(id: Long): SixHabitsMaterial?
+
+    @Query("SELECT COUNT(*) FROM six_habits_materials WHERE materialType = :type")
+    suspend fun countByType(type: String): Int
+}
+

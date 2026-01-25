@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.languagepracticev3.data.model.GlobalRevisionSession
 import com.example.languagepracticev3.data.model.GlobalRevisionStep
+import com.example.languagepracticev3.ui.screens.selfquestioning.trainings.SixHabitsTrainingContent
 import com.example.languagepracticev3.viewmodel.SelfQuestioningMode
 import com.example.languagepracticev3.viewmodel.SelfQuestioningUiState
 import com.example.languagepracticev3.viewmodel.SelfQuestioningViewModel
@@ -121,6 +122,42 @@ private fun LeftPanel(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // ★追加: 6つの思考習慣ボタン
+        ElevatedButton(
+            onClick = { onSelectMode(SelfQuestioningMode.SIX_HABITS) },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.elevatedButtonColors(
+                containerColor = if (selectedMode == SelfQuestioningMode.SIX_HABITS)
+                    MaterialTheme.colorScheme.secondaryContainer
+                else
+                    MaterialTheme.colorScheme.surface
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    Icons.Default.Lightbulb,
+                    contentDescription = null,
+                    modifier = Modifier.size(32.dp),
+                    tint = MaterialTheme.colorScheme.secondary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "6つの思考習慣",
+                    style = MaterialTheme.typography.titleSmall
+                )
+                Text(
+                    "表現者の脳を作る訓練",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
         // グローバル・リビジョン ボタン
         ElevatedButton(
             onClick = { onSelectMode(SelfQuestioningMode.GLOBAL_REVISION) },
@@ -164,17 +201,46 @@ private fun LeftPanel(
             )
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    "グローバル・リビジョンとは",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    "文章を「書き直す」というより、新しい文章を設計し直す認知的活動です。" +
-                            "熟練者は「核から始める」ことで、文章の品質を飛躍的に高めます。",
-                    style = MaterialTheme.typography.bodySmall
-                )
+                when (selectedMode) {
+                    SelfQuestioningMode.SIX_HABITS -> {
+                        Text(
+                            "6つの思考習慣とは",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "脳科学・熟達研究に基づく、表現者の思考様式を訓練します。\n" +
+                                    "①素材として見る ②比喩で翻訳 ③観察=対話 ④経験の錬金術 ⑤メタ認知 ⑥儀式としてのルーティン",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    SelfQuestioningMode.GLOBAL_REVISION -> {
+                        Text(
+                            "グローバル・リビジョンとは",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "文章を「書き直す」というより、新しい文章を設計し直す認知的活動です。" +
+                                    "熟練者は「核から始める」ことで、文章の品質を飛躍的に高めます。",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    SelfQuestioningMode.NONE -> {
+                        Text(
+                            "トレーニングを選択",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "上のボタンから、実行したいトレーニングを選んでください。",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
             }
         }
     }
@@ -218,6 +284,12 @@ private fun RightPanel(
             GlobalRevisionTrainingContent(
                 uiState = uiState,
                 viewModel = viewModel,
+                modifier = modifier
+            )
+        }
+        SelfQuestioningMode.SIX_HABITS -> {
+            // ★追加: 6つの思考習慣トレーニング
+            SixHabitsTrainingContent(
                 modifier = modifier
             )
         }
