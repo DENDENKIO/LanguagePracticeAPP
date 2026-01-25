@@ -47,18 +47,8 @@ android {
         compose = true
     }
 }
-dependencies {
-    // Room
-    val roomVersion = "2.6.1"
-    implementation("androidx.room:room-runtime:$roomVersion")
-    implementation("androidx.room:room-ktx:$roomVersion")
-    ksp("androidx.room:room-compiler:$roomVersion")
 
-    // Hilt (既に使用中の場合はスキップ)
-    implementation("com.google.dagger:hilt-android:2.48")
-    ksp("com.google.dagger:hilt-compiler:2.48")
-    implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
-}
+// ★修正: 1つのdependenciesブロックに統合
 dependencies {
     // Core Android
     implementation(libs.androidx.core.ktx)
@@ -92,9 +82,6 @@ dependencies {
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
-
-    // WebView (for AI site integration) - 標準ライブラリなので追加不要
-    // implementation("androidx.webkit:webkit:1.9.0") // 必要に応じて
 
     // Testing
     testImplementation(libs.junit)
