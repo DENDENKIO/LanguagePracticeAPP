@@ -106,18 +106,15 @@ object AppModule {
         return database.sixHabitsMaterialDao()
     }
 
-    // ★追加: 抽象化テクニック
+    // 抽象化テクニック
     @Provides
     fun provideAbstractionSessionDao(database: AppDatabase): AbstractionSessionDao {
         return database.abstractionSessionDao()
     }
 
-    // AppModule.kt に以下を追加
-
+    // ★物質-抽象変換（重複削除・@Singletonなし）
     @Provides
-    @Singleton
     fun provideMaterialAbstractionSessionDao(database: AppDatabase): MaterialAbstractionSessionDao {
         return database.materialAbstractionSessionDao()
     }
-
 }
