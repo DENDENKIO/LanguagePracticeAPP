@@ -45,7 +45,7 @@ import com.example.languagepracticev3.data.model.*
         // ★追加: 物質-抽象変換
         MaterialAbstractionSession::class
     ],
-    version = 6,  // ★バージョンをインクリメント（5→6）
+    version = 7,  // ★バージョンをインクリメント（5→6）
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
