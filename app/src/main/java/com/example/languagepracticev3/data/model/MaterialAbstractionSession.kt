@@ -1,4 +1,3 @@
-// app/src/main/java/com/example/languagepracticev3/data/model/MaterialAbstractionSession.kt
 package com.example.languagepracticev3.data.model
 
 import androidx.room.Entity
@@ -19,12 +18,14 @@ data class MaterialAbstractionSession(
     // ===== 物質→抽象コース用 =====
     val selectedMaterial: String = "",
 
-    // 観察フェーズ（5感覚）
-    val observationVisual: String = "",
-    val observationTactile: String = "",
-    val observationAuditory: String = "",
-    val observationOlfactory: String = "",
-    val observationGustatory: String = "",
+    // 観察フェーズ（7項目に細分化）
+    val observationVisual: String = "",      // 形
+    val observationTactile: String = "",     // 色
+    val observationAuditory: String = "",    // 光
+    val observationOlfactory: String = "",   // 触感
+    val observationGustatory: String = "",   // におい
+    val observationSound: String = "",       // 音
+    val observationContext: String = "",     // 状況
 
     // 特徴抽出フェーズ
     val featureFormState: String = "",

@@ -1,4 +1,3 @@
-// app/src/main/java/com/example/languagepracticev3/viewmodel/MaterialAbstractionViewModel.kt
 package com.example.languagepracticev3.viewmodel
 
 import androidx.lifecycle.ViewModel
@@ -36,13 +35,14 @@ data class MaterialAbstractionUiState(
     val inputMaterial: String = "",
     val materialValidationError: String = "",
 
-    // 観察フェーズ
-    val inputObservationVisual: String = "",
-    val inputObservationTactile: String = "",
-    val inputObservationAuditory: String = "",
-    val inputObservationOlfactory: String = "",
-    val inputObservationGustatory: String = "",
-    val currentSenseTab: SenseType = SenseType.VISUAL,
+    // 観察フェーズ（7項目に細分化）
+    val inputObservationShape: String = "",      // 形
+    val inputObservationColor: String = "",      // 色
+    val inputObservationLight: String = "",      // 光
+    val inputObservationTouch: String = "",      // 触感
+    val inputObservationSmell: String = "",      // におい
+    val inputObservationSound: String = "",      // 音
+    val inputObservationContext: String = "",    // 状況
 
     // 特徴抽出
     val inputFeatureFormState: String = "",
@@ -193,11 +193,13 @@ class MaterialAbstractionViewModel @Inject constructor(
             },
             // 物質→抽象コース用
             inputMaterial = session.selectedMaterial,
-            inputObservationVisual = session.observationVisual,
-            inputObservationTactile = session.observationTactile,
-            inputObservationAuditory = session.observationAuditory,
-            inputObservationOlfactory = session.observationOlfactory,
-            inputObservationGustatory = session.observationGustatory,
+            inputObservationShape = session.observationVisual,
+            inputObservationColor = session.observationTactile,
+            inputObservationLight = session.observationAuditory,
+            inputObservationTouch = session.observationOlfactory,
+            inputObservationSmell = session.observationGustatory,
+            inputObservationSound = session.observationSound,
+            inputObservationContext = session.observationContext,
             inputFeatureFormState = session.featureFormState,
             inputFeatureTimePassage = session.featureTimePassage,
             inputFeaturePositionPlacement = session.featurePositionPlacement,
@@ -283,11 +285,13 @@ class MaterialAbstractionViewModel @Inject constructor(
                 currentStep = currentStep,
                 // 物質→抽象コース用
                 selectedMaterial = state.inputMaterial,
-                observationVisual = state.inputObservationVisual,
-                observationTactile = state.inputObservationTactile,
-                observationAuditory = state.inputObservationAuditory,
-                observationOlfactory = state.inputObservationOlfactory,
-                observationGustatory = state.inputObservationGustatory,
+                observationVisual = state.inputObservationShape,
+                observationTactile = state.inputObservationColor,
+                observationAuditory = state.inputObservationLight,
+                observationOlfactory = state.inputObservationTouch,
+                observationGustatory = state.inputObservationSmell,
+                observationSound = state.inputObservationSound,
+                observationContext = state.inputObservationContext,
                 featureFormState = state.inputFeatureFormState,
                 featureTimePassage = state.inputFeatureTimePassage,
                 featurePositionPlacement = state.inputFeaturePositionPlacement,
@@ -570,15 +574,17 @@ class MaterialAbstractionViewModel @Inject constructor(
     private fun validateObservation(): Boolean {
         val state = _uiState.value
         val filledCount = listOf(
-            state.inputObservationVisual,
-            state.inputObservationTactile,
-            state.inputObservationAuditory,
-            state.inputObservationOlfactory,
-            state.inputObservationGustatory
+            state.inputObservationShape,
+            state.inputObservationColor,
+            state.inputObservationLight,
+            state.inputObservationTouch,
+            state.inputObservationSmell,
+            state.inputObservationSound,
+            state.inputObservationContext
         ).count { it.isNotBlank() }
 
-        if (filledCount < 3) {
-            _uiState.update { it.copy(statusMessage = "最低3つの感覚で観察を記述してください（現在: ${filledCount}つ）") }
+        if (filledCount < 5) {
+            _uiState.update { it.copy(statusMessage = "最低5項目は記入してください（現在: ${filledCount}項目）") }
             return false
         }
         return true
@@ -762,19 +768,23 @@ class MaterialAbstractionViewModel @Inject constructor(
         _uiState.update { it.copy(inputMaterial = value, materialValidationError = "") }
     }
 
-    fun updateObservationVisual(value: String) = _uiState.update { it.copy(inputObservationVisual = value) }
-    fun updateObservationTactile(value: String) = _uiState.update { it.copy(inputObservationTactile = value) }
-    fun updateObservationAuditory(value: String) = _uiState.update { it.copy(inputObservationAuditory = value) }
-    fun updateObservationOlfactory(value: String) = _uiState.update { it.copy(inputObservationOlfactory = value) }
-    fun updateObservationGustatory(value: String) = _uiState.update { it.copy(inputObservationGustatory = value) }
-    fun selectSenseTab(sense: SenseType) = _uiState.update { it.copy(currentSenseTab = sense) }
+    // 観察フェーズ（7項目）
+    fun updateObservationShape(value: String) = _uiState.update { it.copy(inputObservationShape = value) }
+    fun updateObservationColor(value: String) = _uiState.update { it.copy(inputObservationColor = value) }
+    fun updateObservationLight(value: String) = _uiState.update { it.copy(inputObservationLight = value) }
+    fun updateObservationTouch(value: String) = _uiState.update { it.copy(inputObservationTouch = value) }
+    fun updateObservationSmell(value: String) = _uiState.update { it.copy(inputObservationSmell = value) }
+    fun updateObservationSound(value: String) = _uiState.update { it.copy(inputObservationSound = value) }
+    fun updateObservationContext(value: String) = _uiState.update { it.copy(inputObservationContext = value) }
 
+    // 特徴抽出
     fun updateFeatureFormState(value: String) = _uiState.update { it.copy(inputFeatureFormState = value) }
     fun updateFeatureTimePassage(value: String) = _uiState.update { it.copy(inputFeatureTimePassage = value) }
     fun updateFeaturePositionPlacement(value: String) = _uiState.update { it.copy(inputFeaturePositionPlacement = value) }
     fun updateFeatureCustom(value: String) = _uiState.update { it.copy(inputFeatureCustom = value) }
     fun selectFeatureAspect(aspect: FeatureAspect) = _uiState.update { it.copy(currentFeatureAspect = aspect) }
 
+    // 連想フェーズ
     fun updateAssociationFromFormState(value: String) = _uiState.update { it.copy(inputAssociationFromFormState = value) }
     fun updateAssociationFromTimePassage(value: String) = _uiState.update { it.copy(inputAssociationFromTimePassage = value) }
     fun updateAssociationFromPositionPlacement(value: String) = _uiState.update { it.copy(inputAssociationFromPositionPlacement = value) }
@@ -875,12 +885,13 @@ class MaterialAbstractionViewModel @Inject constructor(
             // 物質→抽象コース
             inputMaterial = "",
             materialValidationError = "",
-            inputObservationVisual = "",
-            inputObservationTactile = "",
-            inputObservationAuditory = "",
-            inputObservationOlfactory = "",
-            inputObservationGustatory = "",
-            currentSenseTab = SenseType.VISUAL,
+            inputObservationShape = "",
+            inputObservationColor = "",
+            inputObservationLight = "",
+            inputObservationTouch = "",
+            inputObservationSmell = "",
+            inputObservationSound = "",
+            inputObservationContext = "",
             inputFeatureFormState = "",
             inputFeatureTimePassage = "",
             inputFeaturePositionPlacement = "",
