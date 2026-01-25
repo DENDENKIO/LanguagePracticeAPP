@@ -21,10 +21,12 @@ class DataRepository @Inject constructor(
     private val compareDao: CompareDao,
     private val experimentDao: ExperimentDao,
     private val globalRevisionSessionDao: GlobalRevisionSessionDao,
-    // ★追加: 6つの思考習慣
+    // 6つの思考習慣
     private val sixHabitsSessionDao: SixHabitsSessionDao,
     private val sixHabitsDailyTrackingDao: SixHabitsDailyTrackingDao,
-    private val sixHabitsMaterialDao: SixHabitsMaterialDao
+    private val sixHabitsMaterialDao: SixHabitsMaterialDao,
+    // ★追加: 抽象化テクニック
+    private val abstractionSessionDao: AbstractionSessionDao
 ) {
     // Work
     suspend fun insertWork(work: Work): Long = workDao.insert(work)
@@ -79,7 +81,7 @@ class DataRepository @Inject constructor(
     }
 
     // =====================================
-    // ★追加: 6つの思考習慣
+    // 6つの思考習慣
     // =====================================
 
     // Session
@@ -158,5 +160,38 @@ class DataRepository @Inject constructor(
 
     suspend fun countSixHabitsMaterialsByType(type: String): Int {
         return sixHabitsMaterialDao.countByType(type)
+    }
+
+    // =====================================
+    // ★追加: 抽象化テクニック
+    // =====================================
+
+    fun getAllAbstractionSessions(): Flow<List<AbstractionSession>> {
+        return abstractionSessionDao.observeAll()
+    }
+
+    suspend fun getAbstractionSessionById(id: Long): AbstractionSession? {
+        return abstractionSessionDao.getById(id)
+    }
+
+    suspend fun saveAbstractionSession(session: AbstractionSession): Long {
+        return if (session.id == 0L) {
+            abstractionSessionDao.insert(session)
+        } else {
+            abstractionSessionDao.update(session)
+            session.id
+        }
+    }
+
+    suspend fun deleteAbstractionSession(session: AbstractionSession) {
+        abstractionSessionDao.delete(session)
+    }
+
+    suspend fun getLastIncompleteAbstractionSession(): AbstractionSession? {
+        return abstractionSessionDao.getLastIncomplete()
+    }
+
+    suspend fun getRecentCompletedAbstractionSessions(limit: Int): List<AbstractionSession> {
+        return abstractionSessionDao.getRecentCompleted(limit)
     }
 }

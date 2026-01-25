@@ -4,6 +4,7 @@ package com.example.languagepracticev3.data.database
 import androidx.room.*
 import com.example.languagepracticev3.data.model.*
 import kotlinx.coroutines.flow.Flow
+import com.example.languagepracticev3.data.model.AbstractionSession
 
 // ========== 設定DAO ==========
 @Dao
@@ -546,5 +547,32 @@ interface SixHabitsMaterialDao {
 
     @Query("SELECT COUNT(*) FROM six_habits_materials WHERE materialType = :type")
     suspend fun countByType(type: String): Int
+}
+
+@Dao
+interface AbstractionSessionDao {
+    @Query("SELECT * FROM abstraction_sessions ORDER BY updatedAt DESC")
+    fun observeAll(): Flow<List<AbstractionSession>>
+
+    @Query("SELECT * FROM abstraction_sessions WHERE id = :id")
+    suspend fun getById(id: Long): AbstractionSession?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(session: AbstractionSession): Long
+
+    @Update
+    suspend fun update(session: AbstractionSession)
+
+    @Delete
+    suspend fun delete(session: AbstractionSession)
+
+    @Query("DELETE FROM abstraction_sessions")
+    suspend fun deleteAll()
+
+    @Query("SELECT * FROM abstraction_sessions WHERE isCompleted = 0 ORDER BY updatedAt DESC LIMIT 1")
+    suspend fun getLastIncomplete(): AbstractionSession?
+
+    @Query("SELECT * FROM abstraction_sessions WHERE isCompleted = 1 ORDER BY updatedAt DESC LIMIT :limit")
+    suspend fun getRecentCompleted(limit: Int): List<AbstractionSession>
 }
 

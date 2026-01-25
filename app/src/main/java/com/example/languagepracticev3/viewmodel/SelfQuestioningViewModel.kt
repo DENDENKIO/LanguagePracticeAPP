@@ -22,7 +22,8 @@ import javax.inject.Inject
 enum class SelfQuestioningMode {
     NONE,
     GLOBAL_REVISION,
-    SIX_HABITS  // ★追加
+    SIX_HABITS,  // ★追加
+    ABSTRACTION  // ★追加: 抽象化テクニック
 }
 
 /**

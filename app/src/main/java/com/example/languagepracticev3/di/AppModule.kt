@@ -90,7 +90,7 @@ object AppModule {
         return database.globalRevisionSessionDao()
     }
 
-    // ★追加: 6つの思考習慣
+    // 6つの思考習慣
     @Provides
     fun provideSixHabitsSessionDao(database: AppDatabase): SixHabitsSessionDao {
         return database.sixHabitsSessionDao()
@@ -104,5 +104,11 @@ object AppModule {
     @Provides
     fun provideSixHabitsMaterialDao(database: AppDatabase): SixHabitsMaterialDao {
         return database.sixHabitsMaterialDao()
+    }
+
+    // ★追加: 抽象化テクニック
+    @Provides
+    fun provideAbstractionSessionDao(database: AppDatabase): AbstractionSessionDao {
+        return database.abstractionSessionDao()
     }
 }

@@ -36,12 +36,14 @@ import com.example.languagepracticev3.data.model.*
         MsReview::class,
         MsExportLog::class,
         GlobalRevisionSession::class,
-        // ★追加: 6つの思考習慣
+        // 6つの思考習慣
         SixHabitsSession::class,
         SixHabitsDailyTracking::class,
-        SixHabitsMaterial::class
+        SixHabitsMaterial::class,
+        // ★追加: 抽象化テクニック
+        AbstractionSession::class
     ],
-    version = 4,  // ★バージョンをインクリメント（3→4）
+    version = 5,  // ★バージョンをインクリメント（4→5）
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -59,10 +61,12 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun poetryLabDao(): PoetryLabDao
     abstract fun mindsetLabDao(): MindsetLabDao
     abstract fun globalRevisionSessionDao(): GlobalRevisionSessionDao
-    // ★追加: 6つの思考習慣
+    // 6つの思考習慣
     abstract fun sixHabitsSessionDao(): SixHabitsSessionDao
     abstract fun sixHabitsDailyTrackingDao(): SixHabitsDailyTrackingDao
     abstract fun sixHabitsMaterialDao(): SixHabitsMaterialDao
+    // ★追加: 抽象化テクニック
+    abstract fun abstractionSessionDao(): AbstractionSessionDao
 
     companion object {
         @Volatile

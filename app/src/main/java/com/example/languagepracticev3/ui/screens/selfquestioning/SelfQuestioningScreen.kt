@@ -19,6 +19,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.languagepracticev3.data.model.GlobalRevisionSession
 import com.example.languagepracticev3.data.model.GlobalRevisionStep
 import com.example.languagepracticev3.ui.screens.selfquestioning.trainings.SixHabitsTrainingContent
+import com.example.languagepracticev3.ui.screens.selfquestioning.trainings.AbstractionTrainingContent  // ★追加
 import com.example.languagepracticev3.viewmodel.SelfQuestioningMode
 import com.example.languagepracticev3.viewmodel.SelfQuestioningUiState
 import com.example.languagepracticev3.viewmodel.SelfQuestioningViewModel
@@ -75,6 +76,7 @@ fun SelfQuestioningScreen(
             RightPanel(
                 uiState = uiState,
                 viewModel = viewModel,
+                onExitTraining = { viewModel.clearMode() },  // ★追加: トレーニング中断時のコールバック
                 modifier = Modifier
                     .weight(2f)
                     .fillMaxHeight()
@@ -122,7 +124,7 @@ private fun LeftPanel(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // ★追加: 6つの思考習慣ボタン
+        // 6つの思考習慣ボタン
         ElevatedButton(
             onClick = { onSelectMode(SelfQuestioningMode.SIX_HABITS) },
             modifier = Modifier.fillMaxWidth(),
@@ -191,6 +193,42 @@ private fun LeftPanel(
             }
         }
 
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // ★追加: 抽象化テクニック ボタン
+        ElevatedButton(
+            onClick = { onSelectMode(SelfQuestioningMode.ABSTRACTION) },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.elevatedButtonColors(
+                containerColor = if (selectedMode == SelfQuestioningMode.ABSTRACTION)
+                    MaterialTheme.colorScheme.tertiaryContainer
+                else
+                    MaterialTheme.colorScheme.surface
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    Icons.Default.Layers,
+                    contentDescription = null,
+                    modifier = Modifier.size(32.dp),
+                    tint = MaterialTheme.colorScheme.tertiary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "抽象化テクニック",
+                    style = MaterialTheme.typography.titleSmall
+                )
+                Text(
+                    "具体⇔抽象の往復訓練",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
         Spacer(modifier = Modifier.weight(1f))
 
         // 説明カード
@@ -228,6 +266,21 @@ private fun LeftPanel(
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
+                    // ★追加: 抽象化テクニックの説明
+                    SelfQuestioningMode.ABSTRACTION -> {
+                        Text(
+                            "抽象化テクニックとは",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "「具体」と「抽象」を意識的に往復させることで、" +
+                                    "表面的な描写から多層的な意味を持つ文章へと進化させます。\n" +
+                                    "Show, Don't Tell、メタファー、感覚的詳細を活用します。",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                     SelfQuestioningMode.NONE -> {
                         Text(
                             "トレーニングを選択",
@@ -253,6 +306,7 @@ private fun LeftPanel(
 private fun RightPanel(
     uiState: SelfQuestioningUiState,
     viewModel: SelfQuestioningViewModel,
+    onExitTraining: () -> Unit,  // ★追加
     modifier: Modifier = Modifier
 ) {
     when (uiState.selectedMode) {
@@ -288,8 +342,15 @@ private fun RightPanel(
             )
         }
         SelfQuestioningMode.SIX_HABITS -> {
-            // ★追加: 6つの思考習慣トレーニング
+            // 6つの思考習慣トレーニング
             SixHabitsTrainingContent(
+                modifier = modifier
+            )
+        }
+        // ★追加: 抽象化テクニック
+        SelfQuestioningMode.ABSTRACTION -> {
+            AbstractionTrainingContent(
+                onExitTraining = onExitTraining,
                 modifier = modifier
             )
         }
@@ -359,6 +420,11 @@ private fun GlobalRevisionTrainingContent(
         }
     }
 }
+
+// 以下、元のコードのSessionStartScreen, SessionCard, StepIndicator,
+// CoreDefinitionStep, DetectionStep, DiagnosisStep, RevisionPlanStep,
+// ReverseOutlineStep, NavigationButtons, SessionPickerDialog は変更なし
+// （省略 - 元のコードをそのまま使用）
 
 // ====================
 // セッション開始画面
