@@ -42,10 +42,12 @@ import com.example.languagepracticev3.data.model.*
         SixHabitsMaterial::class,
         // 抽象化テクニック
         AbstractionSession::class,
-        // ★追加: 物質-抽象変換
-        MaterialAbstractionSession::class
+        // 物質-抽象変換（2コース版）
+        MaterialAbstractionSession::class,
+        // ★追加: 特徴-抽象変換（7ステップ版）
+        FeatureAbstractionSession::class
     ],
-    version = 7,  // ★バージョンをインクリメント（5→6）
+    version = 8,  // ★バージョンをインクリメント（7→8）
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -69,8 +71,10 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun sixHabitsMaterialDao(): SixHabitsMaterialDao
     // 抽象化テクニック
     abstract fun abstractionSessionDao(): AbstractionSessionDao
-    // ★追加: 物質-抽象変換
+    // 物質-抽象変換（2コース版）
     abstract fun materialAbstractionSessionDao(): MaterialAbstractionSessionDao
+    // ★追加: 特徴-抽象変換（7ステップ版）
+    abstract fun featureAbstractionSessionDao(): FeatureAbstractionSessionDao
 
     companion object {
         @Volatile

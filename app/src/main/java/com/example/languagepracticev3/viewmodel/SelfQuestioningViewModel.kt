@@ -22,9 +22,10 @@ import javax.inject.Inject
 enum class SelfQuestioningMode {
     NONE,
     GLOBAL_REVISION,
-    SIX_HABITS,  // ★追加
-    ABSTRACTION,  // ★追加: 抽象化テクニック
-    MATERIAL_ABSTRACTION  // ★追加: 物質-抽象変換プロセス
+    SIX_HABITS,
+    ABSTRACTION,
+    MATERIAL_ABSTRACTION,
+    FEATURE_ABSTRACTION  // ★追加: 特徴-抽象変換（7ステップ版）
 }
 
 /**
@@ -83,7 +84,8 @@ class SelfQuestioningViewModel @Inject constructor(
         if (mode == SelfQuestioningMode.GLOBAL_REVISION) {
             loadSessions()
         }
-        // ★ SIX_HABITS モードの場合は、別のViewModelで処理
+        // SIX_HABITS, ABSTRACTION, MATERIAL_ABSTRACTION, FEATURE_ABSTRACTION モードは
+        // 各々のViewModelで処理
     }
 
     fun clearMode() {

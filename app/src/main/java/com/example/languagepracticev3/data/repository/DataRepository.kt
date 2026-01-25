@@ -27,8 +27,10 @@ class DataRepository @Inject constructor(
     private val sixHabitsDailyTrackingDao: SixHabitsDailyTrackingDao,
     private val sixHabitsMaterialDao: SixHabitsMaterialDao,
     private val abstractionSessionDao: AbstractionSessionDao,
-    // ★追加: 物質-抽象変換
-    private val materialAbstractionSessionDao: MaterialAbstractionSessionDao
+    // 物質-抽象変換（2コース版）
+    private val materialAbstractionSessionDao: MaterialAbstractionSessionDao,
+    // ★追加: 特徴-抽象変換（7ステップ版）
+    private val featureAbstractionSessionDao: FeatureAbstractionSessionDao
 ) {
 
     // ========== KvSetting ==========
@@ -273,7 +275,7 @@ class DataRepository @Inject constructor(
     suspend fun getRecentCompletedAbstractionSessions(limit: Int): List<AbstractionSession> =
         abstractionSessionDao.getRecentCompleted(limit)
 
-    // ========== MaterialAbstractionSession (物質-抽象変換) ==========
+    // ========== MaterialAbstractionSession (物質-抽象変換 2コース版) ==========
     fun getAllMaterialAbstractionSessions(): Flow<List<MaterialAbstractionSession>> =
         materialAbstractionSessionDao.observeAll()
 
@@ -297,4 +299,29 @@ class DataRepository @Inject constructor(
 
     suspend fun getRecentCompletedMaterialAbstractionSessions(limit: Int): List<MaterialAbstractionSession> =
         materialAbstractionSessionDao.getRecentCompleted(limit)
+
+    // ========== FeatureAbstractionSession (特徴-抽象変換 7ステップ版) ==========
+    fun getAllFeatureAbstractionSessions(): Flow<List<FeatureAbstractionSession>> =
+        featureAbstractionSessionDao.observeAll()
+
+    suspend fun getFeatureAbstractionSessionById(id: Long): FeatureAbstractionSession? =
+        featureAbstractionSessionDao.getById(id)
+
+    suspend fun saveFeatureAbstractionSession(session: FeatureAbstractionSession): Long {
+        return if (session.id == 0L) {
+            featureAbstractionSessionDao.insert(session)
+        } else {
+            featureAbstractionSessionDao.update(session)
+            session.id
+        }
+    }
+
+    suspend fun deleteFeatureAbstractionSession(session: FeatureAbstractionSession) =
+        featureAbstractionSessionDao.delete(session)
+
+    suspend fun getLastIncompleteFeatureAbstractionSession(): FeatureAbstractionSession? =
+        featureAbstractionSessionDao.getLastIncomplete()
+
+    suspend fun getRecentCompletedFeatureAbstractionSessions(limit: Int): List<FeatureAbstractionSession> =
+        featureAbstractionSessionDao.getRecentCompleted(limit)
 }

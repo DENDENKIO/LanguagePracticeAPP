@@ -20,7 +20,8 @@ import com.example.languagepracticev3.data.model.GlobalRevisionSession
 import com.example.languagepracticev3.data.model.GlobalRevisionStep
 import com.example.languagepracticev3.ui.screens.selfquestioning.trainings.SixHabitsTrainingContent
 import com.example.languagepracticev3.ui.screens.selfquestioning.trainings.AbstractionTrainingContent
-import com.example.languagepracticev3.ui.screens.selfquestioning.trainings.MaterialAbstractionTrainingContent  // ★追加
+import com.example.languagepracticev3.ui.screens.selfquestioning.trainings.MaterialAbstractionTrainingContent
+import com.example.languagepracticev3.ui.screens.selfquestioning.trainings.FeatureAbstractionTrainingContent  // ★追加
 import com.example.languagepracticev3.viewmodel.SelfQuestioningMode
 import com.example.languagepracticev3.viewmodel.SelfQuestioningUiState
 import com.example.languagepracticev3.viewmodel.SelfQuestioningViewModel
@@ -109,7 +110,7 @@ private fun LeftPanel(
     Column(
         modifier = modifier
             .padding(16.dp)
-            .verticalScroll(rememberScrollState()),  // ★追加: スクロール可能に
+            .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
@@ -233,7 +234,7 @@ private fun LeftPanel(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // ★追加: 物質-抽象変換 ボタン
+        // 物質-抽象変換 ボタン（2コース版）
         ElevatedButton(
             onClick = { onSelectMode(SelfQuestioningMode.MATERIAL_ABSTRACTION) },
             modifier = Modifier.fillMaxWidth(),
@@ -261,6 +262,42 @@ private fun LeftPanel(
                 )
                 Text(
                     "具体から感情を引き出す",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // ★追加: 特徴-抽象変換 ボタン（7ステップ版）
+        ElevatedButton(
+            onClick = { onSelectMode(SelfQuestioningMode.FEATURE_ABSTRACTION) },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.elevatedButtonColors(
+                containerColor = if (selectedMode == SelfQuestioningMode.FEATURE_ABSTRACTION)
+                    MaterialTheme.colorScheme.inversePrimary
+                else
+                    MaterialTheme.colorScheme.surface
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    Icons.Default.FilterList,
+                    contentDescription = null,
+                    modifier = Modifier.size(32.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "特徴-抽象変換",
+                    style = MaterialTheme.typography.titleSmall
+                )
+                Text(
+                    "7ステップで感情を引き出す",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -318,7 +355,6 @@ private fun LeftPanel(
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
-                    // ★追加: 物質-抽象変換の説明
                     SelfQuestioningMode.MATERIAL_ABSTRACTION -> {
                         Text(
                             "物質-抽象変換とは",
@@ -329,7 +365,22 @@ private fun LeftPanel(
                         Text(
                             "日常の身近な物質を観察し、その特徴から感情を引き出し、" +
                                     "禁止ワードを避けながら表現するプロセスです。\n" +
-                                    "7つのステップで「具体→抽象→具体」を往復します。",
+                                    "2つのコース（物質→抽象 / 抽象→物質）を選べます。",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    // ★追加: 特徴-抽象変換の説明
+                    SelfQuestioningMode.FEATURE_ABSTRACTION -> {
+                        Text(
+                            "特徴-抽象変換とは",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "7つのステップで物質の特徴から感情を引き出します:\n" +
+                                    "①観察 ②特徴抽出 ③軸・タグ選択 ④収束 ⑤連想 ⑥テーマ決定 ⑦抽象語禁止で表現\n" +
+                                    "仕様書(JSON.txt)に基づく20軸・200タグを活用します。",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
@@ -407,9 +458,16 @@ private fun RightPanel(
                 modifier = modifier
             )
         }
-        // ★追加: 物質-抽象変換
         SelfQuestioningMode.MATERIAL_ABSTRACTION -> {
+            // 物質-抽象変換（2コース版）
             MaterialAbstractionTrainingContent(
+                onExitTraining = onExitTraining,
+                modifier = modifier
+            )
+        }
+        // ★追加: 特徴-抽象変換（7ステップ版）
+        SelfQuestioningMode.FEATURE_ABSTRACTION -> {
+            FeatureAbstractionTrainingContent(
                 onExitTraining = onExitTraining,
                 modifier = modifier
             )

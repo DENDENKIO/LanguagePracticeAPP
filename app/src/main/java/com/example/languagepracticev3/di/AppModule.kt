@@ -112,9 +112,15 @@ object AppModule {
         return database.abstractionSessionDao()
     }
 
-    // ★物質-抽象変換（重複削除・@Singletonなし）
+    // 物質-抽象変換（2コース版）
     @Provides
     fun provideMaterialAbstractionSessionDao(database: AppDatabase): MaterialAbstractionSessionDao {
         return database.materialAbstractionSessionDao()
+    }
+
+    // ★追加: 特徴-抽象変換（7ステップ版）
+    @Provides
+    fun provideFeatureAbstractionSessionDao(database: AppDatabase): FeatureAbstractionSessionDao {
+        return database.featureAbstractionSessionDao()
     }
 }
