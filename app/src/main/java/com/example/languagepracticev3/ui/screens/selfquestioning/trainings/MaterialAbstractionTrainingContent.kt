@@ -1,8 +1,7 @@
 // app/src/main/java/com/example/languagepracticev3/ui/screens/selfquestioning/trainings/MaterialAbstractionTrainingContent.kt
 package com.example.languagepracticev3.ui.screens.selfquestioning.trainings
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -10,7 +9,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -18,20 +16,19 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.languagepracticev3.data.model.*
-import com.example.languagepracticev3.viewmodel.MaterialAbstractionTrainingViewModel
 import com.example.languagepracticev3.viewmodel.MaterialAbstractionUiState
+import com.example.languagepracticev3.viewmodel.MaterialAbstractionViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MaterialAbstractionTrainingContent(
-    viewModel: MaterialAbstractionTrainingViewModel = hiltViewModel(),
+    viewModel: MaterialAbstractionViewModel = hiltViewModel(),
     onExitTraining: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -54,34 +51,66 @@ fun MaterialAbstractionTrainingContent(
                 .padding(padding)
         ) {
             // ヘッダー
-            MaterialAbstractionHeader(
-                hasSession = uiState.currentSession != null,
+            TrainingHeader(
+                title = when {
+                    uiState.selectedCourse == null -> "物質-抽象変換"
+                    uiState.currentSession == null -> uiState.selectedCourse!!.displayName
+                    else -> uiState.selectedCourse!!.displayName
+                },
                 onBack = {
-                    if (uiState.currentSession != null) {
-                        viewModel.showExitConfirmation()
-                    } else {
-                        onExitTraining()
+                    when {
+                        uiState.currentSession != null -> viewModel.showExitConfirmation()
+                        uiState.selectedCourse != null -> viewModel.clearCourse()
+                        else -> onExitTraining()
                     }
                 },
-                onShowSessions = { viewModel.showSessionPicker() }
+                onShowSessions = { viewModel.showSessionPicker() },
+                showSessionsButton = uiState.currentSession != null
             )
 
             // メインコンテンツ
-            if (uiState.currentSession == null) {
-                MaterialAbstractionSessionStartScreen(
-                    sessions = uiState.sessions,
-                    onNewSession = { viewModel.startNewSession() },
-                    onLoadSession = { viewModel.loadSession(it) },
-                    onDeleteSession = { viewModel.deleteSession(it) },
-                    onShowDetail = { viewModel.showHistoryDetail(it) },
-                    modifier = Modifier.weight(1f)
-                )
-            } else {
-                MaterialAbstractionTrainingFlow(
-                    uiState = uiState,
-                    viewModel = viewModel,
-                    modifier = Modifier.weight(1f)
-                )
+            when {
+                uiState.selectedCourse == null -> {
+                    // コース選択画面
+                    CourseSelectionScreen(
+                        sessions = uiState.sessions,
+                        onSelectCourse = { viewModel.selectCourse(it) },
+                        onLoadSession = { viewModel.loadSession(it) },
+                        onDeleteSession = { viewModel.deleteSession(it) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                uiState.currentSession == null -> {
+                    // セッション開始画面
+                    SessionStartScreen(
+                        course = uiState.selectedCourse!!,
+                        sessions = uiState.sessions.filter { it.courseType == uiState.selectedCourse!!.ordinal },
+                        onNewSession = { viewModel.startNewSession() },
+                        onLoadSession = { viewModel.loadSession(it) },
+                        onDeleteSession = { viewModel.deleteSession(it) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                else -> {
+                    // トレーニングフロー
+                    when (uiState.selectedCourse) {
+                        MaterialAbstractionCourse.MATERIAL_TO_ABSTRACT -> {
+                            MaterialToAbstractFlow(
+                                uiState = uiState,
+                                viewModel = viewModel,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        MaterialAbstractionCourse.ABSTRACT_TO_MATERIAL -> {
+                            AbstractToMaterialFlow(
+                                uiState = uiState,
+                                viewModel = viewModel,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        null -> {}
+                    }
+                }
             }
         }
     }
@@ -97,7 +126,7 @@ fun MaterialAbstractionTrainingContent(
                     viewModel.confirmExit()
                     onExitTraining()
                 }) {
-                    Text("中断する")
+                    Text("中断して戻る")
                 }
             },
             dismissButton = {
@@ -119,57 +148,12 @@ fun MaterialAbstractionTrainingContent(
 
     // セッションピッカーダイアログ
     if (uiState.showSessionPicker) {
-        MaterialAbstractionSessionPickerDialog(
+        SessionPickerDialog(
             sessions = uiState.sessions,
             onSelect = { viewModel.loadSession(it) },
             onNewSession = { viewModel.startNewSession() },
             onDelete = { viewModel.deleteSession(it) },
-            onShowDetail = { viewModel.showHistoryDetail(it) },
             onDismiss = { viewModel.hideSessionPicker() }
-        )
-    }
-
-    // 履歴詳細ダイアログ
-    if (uiState.showHistoryDetail && uiState.historyDetailSession != null) {
-        HistoryDetailDialog(
-            session = uiState.historyDetailSession!!,
-            onDismiss = { viewModel.hideHistoryDetail() }
-        )
-    }
-
-    // 軸選択ダイアログ
-    if (uiState.showAxisSelector) {
-        AxisSelectorDialog(
-            axes = viewModel.dictionary.axes,
-            selectedAxes = uiState.selectedAxes,
-            onToggle = { viewModel.toggleAxis(it) },
-            onDismiss = { viewModel.hideAxisSelector() }
-        )
-    }
-
-    // タグ選択ダイアログ
-    if (uiState.showTagSelector) {
-        TagSelectorDialog(
-            recommendedTags = viewModel.getRecommendedTags(),
-            allTags = viewModel.dictionary.tags,
-            selectedTags = uiState.selectedTags,
-            onToggle = { viewModel.toggleTag(it) },
-            modePreference = uiState.modePreference,
-            onModeChange = { viewModel.setModePreference(it) },
-            onDismiss = { viewModel.hideTagSelector() }
-        )
-    }
-
-    // テンプレート選択ダイアログ
-    if (uiState.showTemplateSelector) {
-        TemplateSelectorDialog(
-            templates = viewModel.dictionary.templateFrames,
-            selectedTags = uiState.selectedTags,
-            targetMaterial = uiState.inputTargetMaterial,
-            onSelectTemplate = { templateId, customValues ->
-                viewModel.generateTagSentence(templateId, customValues)
-            },
-            onDismiss = { viewModel.hideTemplateSelector() }
         )
     }
 }
@@ -178,10 +162,11 @@ fun MaterialAbstractionTrainingContent(
 // ヘッダー
 // ====================
 @Composable
-private fun MaterialAbstractionHeader(
-    hasSession: Boolean,
+private fun TrainingHeader(
+    title: String,
     onBack: () -> Unit,
-    onShowSessions: () -> Unit
+    onShowSessions: () -> Unit,
+    showSessionsButton: Boolean
 ) {
     Row(
         modifier = Modifier
@@ -193,12 +178,12 @@ private fun MaterialAbstractionHeader(
             Icon(Icons.Default.ArrowBack, contentDescription = "戻る")
         }
         Text(
-            text = "物質-抽象変換",
+            text = title,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.weight(1f)
         )
-        if (hasSession) {
+        if (showSessionsButton) {
             IconButton(onClick = onShowSessions) {
                 Icon(Icons.Default.FolderOpen, contentDescription = "セッション一覧")
             }
@@ -208,51 +193,187 @@ private fun MaterialAbstractionHeader(
 }
 
 // ====================
-// セッション開始画面
+// コース選択画面
 // ====================
 @Composable
-private fun MaterialAbstractionSessionStartScreen(
+private fun CourseSelectionScreen(
     sessions: List<MaterialAbstractionSession>,
-    onNewSession: () -> Unit,
+    onSelectCourse: (MaterialAbstractionCourse) -> Unit,
     onLoadSession: (MaterialAbstractionSession) -> Unit,
     onDeleteSession: (MaterialAbstractionSession) -> Unit,
-    onShowDetail: (MaterialAbstractionSession) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
             .padding(16.dp)
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            "物質-抽象変換 トレーニング",
+            "物質-抽象変換トレーニング",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            "コースを選択してください",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
 
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // コース選択カード
+        MaterialAbstractionCourse.entries.forEach { course ->
+            CourseCard(
+                course = course,
+                onClick = { onSelectCourse(course) }
+            )
+        }
+
+        // 過去のセッション
+        if (sessions.isNotEmpty()) {
+            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+
+            Text(
+                "過去のセッション",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+
+            sessions.take(5).forEach { session ->
+                SessionCard(
+                    session = session,
+                    onClick = { onLoadSession(session) },
+                    onDelete = { onDeleteSession(session) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CourseCard(
+    course: MaterialAbstractionCourse,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        colors = CardDefaults.cardColors(
+            containerColor = when (course) {
+                MaterialAbstractionCourse.MATERIAL_TO_ABSTRACT ->
+                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                MaterialAbstractionCourse.ABSTRACT_TO_MATERIAL ->
+                    MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)
+            }
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                course.emoji,
+                style = MaterialTheme.typography.headlineMedium
+            )
+            Spacer(Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    course.displayName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    course.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Icon(Icons.Default.ChevronRight, null)
+        }
+    }
+}
+
+// ====================
+// セッション開始画面
+// ====================
+@Composable
+private fun SessionStartScreen(
+    course: MaterialAbstractionCourse,
+    sessions: List<MaterialAbstractionSession>,
+    onNewSession: () -> Unit,
+    onLoadSession: (MaterialAbstractionSession) -> Unit,
+    onDeleteSession: (MaterialAbstractionSession) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text(
+            course.displayName,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold
+        )
+
+        // コースの説明とステップ
         Card(
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
             )
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    "このトレーニングでは、7つのフェーズで「具体（物質）→抽象（感情）」の変換を行います：",
+                    course.description,
                     style = MaterialTheme.typography.bodyMedium
                 )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    "ステップ:",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold
+                )
                 Spacer(modifier = Modifier.height(8.dp))
-                MaterialAbstractionStep.entries.forEachIndexed { index, step ->
-                    Text(
-                        "${index + 1}. ${step.displayName} - ${step.description}",
-                        style = MaterialTheme.typography.bodySmall
-                    )
+
+                when (course) {
+                    MaterialAbstractionCourse.MATERIAL_TO_ABSTRACT -> {
+                        MaterialToAbstractStep.entries.dropLast(1).forEach { step ->
+                            Row(
+                                modifier = Modifier.padding(vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(step.emoji, modifier = Modifier.width(28.dp))
+                                Text(
+                                    "${step.ordinal + 1}. ${step.displayName}",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                    }
+                    MaterialAbstractionCourse.ABSTRACT_TO_MATERIAL -> {
+                        AbstractToMaterialStep.entries.dropLast(1).forEach { step ->
+                            Row(
+                                modifier = Modifier.padding(vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(step.emoji, modifier = Modifier.width(28.dp))
+                                Text(
+                                    "${step.ordinal + 1}. ${step.displayName}",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
-
-        Spacer(modifier = Modifier.height(16.dp))
 
         Button(
             onClick = onNewSession,
@@ -264,1030 +385,69 @@ private fun MaterialAbstractionSessionStartScreen(
         }
 
         if (sessions.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(16.dp))
-            HorizontalDivider()
-            Spacer(modifier = Modifier.height(16.dp))
-
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
             Text(
-                "過去のセッション（履歴）",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold
+                "このコースの過去セッション",
+                style = MaterialTheme.typography.titleSmall
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
-
             sessions.forEach { session ->
-                MaterialAbstractionSessionCard(
+                SessionCard(
                     session = session,
                     onClick = { onLoadSession(session) },
-                    onDelete = { onDeleteSession(session) },
-                    onShowDetail = { onShowDetail(session) }
+                    onDelete = { onDeleteSession(session) }
                 )
-                Spacer(modifier = Modifier.height(8.dp))
             }
         }
     }
 }
 
 @Composable
-private fun MaterialAbstractionSessionCard(
+private fun SessionCard(
     session: MaterialAbstractionSession,
     onClick: () -> Unit,
-    onDelete: () -> Unit,
-    onShowDetail: () -> Unit
+    onDelete: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                if (session.isCompleted) Icons.Default.CheckCircle else Icons.Default.Edit,
-                null,
-                tint = if (session.isCompleted) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(32.dp)
-            )
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    session.sessionTitle.ifEmpty { "無題 #${session.id}" },
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    "対象: ${session.targetMaterial.take(20)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    "ステップ: ${MaterialAbstractionStep.entries.getOrNull(session.currentStep)?.displayName ?: "観察"}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                if (session.isCompleted) {
+        ListItem(
+            headlineContent = {
+                Text(session.sessionTitle.ifBlank { "無題のセッション #${session.id}" })
+            },
+            supportingContent = {
+                Column {
+                    val course = MaterialAbstractionCourse.entries.getOrElse(session.courseType) {
+                        MaterialAbstractionCourse.MATERIAL_TO_ABSTRACT
+                    }
                     Text(
-                        "テーマ: ${session.abstractTheme}  スコア: 抽象${session.abstractScore}/描写${session.sensoryScore}",
+                        course.displayName,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary
                     )
-                }
-            }
-            IconButton(onClick = onShowDetail) {
-                Icon(Icons.Default.Visibility, "詳細を見る")
-            }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, "削除")
-            }
-        }
-    }
-}
-
-// ====================
-// 履歴詳細ダイアログ
-// ====================
-@Composable
-private fun HistoryDetailDialog(
-    session: MaterialAbstractionSession,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                session.sessionTitle.ifEmpty { "セッション #${session.id}" },
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 500.dp)
-                    .verticalScroll(rememberScrollState())
-            ) {
-                // 各フェーズの結果を表示
-                HistorySection("対象物質", session.targetMaterial)
-                HistorySection("観察（生データ）", session.observationRaw)
-                HistorySection("特徴リスト", session.featureList)
-                HistorySection("選択した軸", session.selectedAxes)
-                HistorySection("選択したタグ", session.selectedTags)
-                HistorySection("生成したタグ文", session.tagSentences)
-                HistorySection("強いタグ文", session.strongTagSentences)
-                HistorySection("連想", session.associations.replace("|||", "\n---\n").replace(";;", "\n"))
-                HistorySection("抽象テーマ", session.abstractTheme)
-                HistorySection("禁止ワード", session.forbiddenWords)
-                HistorySection("最終表現", session.finalExpression)
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row {
-                    AssistChip(
-                        onClick = {},
-                        label = { Text("抽象スコア: ${session.abstractScore}/5") }
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    AssistChip(
-                        onClick = {},
-                        label = { Text("描写スコア: ${session.sensoryScore}/5") }
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    "作成: ${session.createdAt.take(16)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("閉じる") }
-        }
-    )
-}
-
-@Composable
-private fun HistorySection(title: String, content: String) {
-    if (content.isBlank()) return
-    Column(modifier = Modifier.padding(vertical = 4.dp)) {
-        Text(
-            title,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            ),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(
-                content,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(8.dp)
-            )
-        }
-    }
-}
-
-// ====================
-// トレーニングフロー
-// ====================
-@Composable
-private fun MaterialAbstractionTrainingFlow(
-    uiState: MaterialAbstractionUiState,
-    viewModel: MaterialAbstractionTrainingViewModel,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier.padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // ステップインジケーター
-        MaterialAbstractionStepIndicator(
-            currentStep = uiState.currentStep,
-            onStepClick = { viewModel.goToStep(it) }
-        )
-
-        // メインコンテンツ（スクロール可能）
-        Card(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp)
-                    .verticalScroll(rememberScrollState())
-            ) {
-                when (uiState.currentStep) {
-                    MaterialAbstractionStep.OBSERVATION -> ObservationStepContent(uiState, viewModel)
-                    MaterialAbstractionStep.FEATURE_EXTRACTION -> FeatureExtractionStepContent(uiState, viewModel)
-                    MaterialAbstractionStep.AXIS_TAG_SELECTION -> AxisTagSelectionStepContent(uiState, viewModel)
-                    MaterialAbstractionStep.CONVERGENCE -> ConvergenceStepContent(uiState, viewModel)
-                    MaterialAbstractionStep.ASSOCIATION -> AssociationStepContent(uiState, viewModel)
-                    MaterialAbstractionStep.THEME_DECISION -> ThemeDecisionStepContent(uiState, viewModel)
-                    MaterialAbstractionStep.FINAL_EXPRESSION -> FinalExpressionStepContent(uiState, viewModel)
-                }
-            }
-        }
-
-        // ナビゲーションボタン
-        MaterialAbstractionNavigationButtons(
-            currentStep = uiState.currentStep,
-            onPrevious = { viewModel.previousStep() },
-            onNext = { viewModel.nextStep() },
-            onSave = { viewModel.saveSession() },
-            onComplete = { viewModel.completeSession() }
-        )
-    }
-}
-
-// ====================
-// ステップインジケーター
-// ====================
-@Composable
-private fun MaterialAbstractionStepIndicator(
-    currentStep: MaterialAbstractionStep,
-    onStepClick: (MaterialAbstractionStep) -> Unit
-) {
-    val steps = MaterialAbstractionStep.entries
-    val currentIndex = currentStep.ordinal
-
-    Column {
-        LinearProgressIndicator(
-            progress = { (currentIndex + 1).toFloat() / steps.size },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            itemsIndexed(steps) { index, step ->
-                FilterChip(
-                    selected = index == currentIndex,
-                    onClick = { onStepClick(step) },
-                    label = { Text("${index + 1}") },
-                    leadingIcon = if (index < currentIndex) {
-                        { Icon(Icons.Default.Check, null, Modifier.size(16.dp)) }
-                    } else null
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            "${currentIndex + 1}/${steps.size}: ${currentStep.displayName}",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            currentStep.description,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-// ====================
-// Phase 1: 観察
-// ====================
-@Composable
-private fun ObservationStepContent(
-    uiState: MaterialAbstractionUiState,
-    viewModel: MaterialAbstractionTrainingViewModel
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-            )
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    "💡 観察のルール",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    "• 意味づけ禁止（「悲しそう」「寂しげ」などは✗）\n" +
-                            "• 5感覚で描写（視覚・聴覚・触覚・嗅覚・味覚）\n" +
-                            "• 事実だけを記録する",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        }
-
-        OutlinedTextField(
-            value = uiState.inputTargetMaterial,
-            onValueChange = { viewModel.updateTargetMaterial(it) },
-            label = { Text("対象物質") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            placeholder = { Text("例: りんご、封筒、卵、スプーン...") }
-        )
-
-        OutlinedTextField(
-            value = uiState.inputObservationRaw,
-            onValueChange = { viewModel.updateObservationRaw(it) },
-            label = { Text("具体描写（5感覚で、意味づけなし）") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 200.dp),
-            minLines = 8,
-            placeholder = {
-                Text(
-                    "例:\n" +
-                            "【視覚】赤と黄色が混ざった皮。表面に小さな点（果点）が散らばっている。\n" +
-                            "【触覚】つるつるしているが、ヘタの周りはざらざら。\n" +
-                            "【嗅覚】甘い香りが微かに。\n" +
-                            "【重さ】手のひらに収まる重さ。200gくらい？"
-                )
-            }
-        )
-    }
-}
-
-// ====================
-// Phase 2: 特徴抽出
-// ====================
-@Composable
-private fun FeatureExtractionStepContent(
-    uiState: MaterialAbstractionUiState,
-    viewModel: MaterialAbstractionTrainingViewModel
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
-            )
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    "📝 特徴抽出のポイント",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    "観察から「事実」だけを短文で抜き出します。\n" +
-                            "• 「〜している」「〜がある」の形で\n" +
-                            "• 最低5つ以上",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        }
-
-        // 観察内容の参照
-        if (uiState.inputObservationRaw.isNotBlank()) {
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text("観察内容:", style = MaterialTheme.typography.labelSmall)
                     Text(
-                        uiState.inputObservationRaw.take(200) +
-                                if (uiState.inputObservationRaw.length > 200) "..." else "",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-        }
-
-        Text(
-            "特徴リスト（事実だけを箇条書き）",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold
-        )
-
-        uiState.inputFeatures.forEachIndexed { index, feature ->
-            OutlinedTextField(
-                value = feature,
-                onValueChange = { viewModel.updateFeature(index, it) },
-                label = { Text("特徴${index + 1}") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                placeholder = {
-                    Text(
-                        when (index) {
-                            0 -> "例: まだ切られていない"
-                            1 -> "例: 皮に小さな点がある"
-                            2 -> "例: 甘い香りがする"
-                            3 -> "例: 手のひらに収まる大きさ"
-                            4 -> "例: ヘタの周りがざらざら"
-                            else -> ""
-                        }
-                    )
-                }
-            )
-        }
-    }
-}
-
-// ====================
-// Phase 3.5: 軸・タグ選択
-// ====================
-@Composable
-private fun AxisTagSelectionStepContent(
-    uiState: MaterialAbstractionUiState,
-    viewModel: MaterialAbstractionTrainingViewModel
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
-            )
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    "🎯 軸・タグ選択 → タグ文生成",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    "1. 特徴に関係する「軸」を選ぶ（20軸から複数可）\n" +
-                            "2. 軸に紐づく「タグ」を選ぶ（各軸1〜2個推奨）\n" +
-                            "3. テンプレートを使って「タグ文」を生成する",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        }
-
-        // 軸選択ボタン
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            OutlinedButton(
-                onClick = { viewModel.showAxisSelector() },
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(Icons.Default.ViewInAr, null)
-                Spacer(Modifier.width(4.dp))
-                Text("軸を選択 (${uiState.selectedAxes.size})")
-            }
-
-            OutlinedButton(
-                onClick = { viewModel.showTagSelector() },
-                modifier = Modifier.weight(1f),
-                enabled = uiState.selectedAxes.isNotEmpty()
-            ) {
-                Icon(Icons.Default.Label, null)
-                Spacer(Modifier.width(4.dp))
-                Text("タグを選択 (${uiState.selectedTags.size})")
-            }
-        }
-
-        // 選択した軸の表示
-        if (uiState.selectedAxes.isNotEmpty()) {
-            Text("選択した軸:", style = MaterialTheme.typography.labelMedium)
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                items(uiState.selectedAxes.toList()) { axisId ->
-                    val axis = viewModel.dictionary.getAxisById(axisId)
-                    if (axis != null) {
-                        AssistChip(
-                            onClick = { viewModel.toggleAxis(axisId) },
-                            label = { Text("${axis.id}.${axis.label}") },
-                            trailingIcon = { Icon(Icons.Default.Close, null, Modifier.size(16.dp)) }
-                        )
-                    }
-                }
-            }
-        }
-
-        // 選択したタグの表示
-        if (uiState.selectedTags.isNotEmpty()) {
-            Text("選択したタグ:", style = MaterialTheme.typography.labelMedium)
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                items(uiState.selectedTags.toList()) { tagId ->
-                    val tag = viewModel.dictionary.getTagById(tagId)
-                    if (tag != null) {
-                        AssistChip(
-                            onClick = { viewModel.toggleTag(tagId) },
-                            label = { Text(tag.label) },
-                            trailingIcon = { Icon(Icons.Default.Close, null, Modifier.size(16.dp)) }
-                        )
-                    }
-                }
-            }
-        }
-
-        HorizontalDivider()
-
-        // タグ文生成
-        Text(
-            "タグ文を生成",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Button(
-                onClick = { viewModel.showTemplateSelector() },
-                enabled = uiState.selectedTags.isNotEmpty()
-            ) {
-                Icon(Icons.Default.AutoAwesome, null)
-                Spacer(Modifier.width(4.dp))
-                Text("テンプレートから生成")
-            }
-        }
-
-        // カスタムタグ文入力
-        OutlinedTextField(
-            value = uiState.inputCustomTagSentence,
-            onValueChange = { viewModel.updateCustomTagSentence(it) },
-            label = { Text("または自由にタグ文を書く") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            trailingIcon = {
-                IconButton(
-                    onClick = { viewModel.addCustomTagSentence(uiState.inputCustomTagSentence) },
-                    enabled = uiState.inputCustomTagSentence.isNotBlank()
-                ) {
-                    Icon(Icons.Default.Add, "追加")
-                }
-            }
-        )
-
-        // 生成したタグ文一覧
-        if (uiState.generatedTagSentences.isNotEmpty()) {
-            Text(
-                "生成したタグ文 (${uiState.generatedTagSentences.size}件)",
-                style = MaterialTheme.typography.labelMedium
-            )
-            uiState.generatedTagSentences.forEachIndexed { index, sentence ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier.padding(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            sentence,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.weight(1f)
-                        )
-                        IconButton(onClick = { viewModel.removeTagSentence(index) }) {
-                            Icon(Icons.Default.Delete, "削除", Modifier.size(20.dp))
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ====================
-// Phase 3.6: 収束
-// ====================
-@Composable
-private fun ConvergenceStepContent(
-    uiState: MaterialAbstractionUiState,
-    viewModel: MaterialAbstractionTrainingViewModel
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-            )
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    "🎯 収束（上位2〜4本に絞る）",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    "タグ文が増えすぎた場合、「強い」と感じるものを2〜4本選んでください。\n" +
-                            "選択基準: 抽象への変換が期待できる / 印象に残る / 核心を突いている",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        }
-
-        Text(
-            "タグ文を選択（${uiState.strongTagSentenceIndices.size}/4）",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold
-        )
-
-        if (uiState.generatedTagSentences.isEmpty()) {
-            Text(
-                "タグ文がありません。前のステップで生成してください。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error
-            )
-        } else {
-            uiState.generatedTagSentences.forEachIndexed { index, sentence ->
-                val isSelected = index in uiState.strongTagSentenceIndices
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { viewModel.toggleStrongTagSentence(index) }
-                        .border(
-                            width = if (isSelected) 2.dp else 0.dp,
-                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                            shape = RoundedCornerShape(8.dp)
-                        ),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (isSelected)
-                            MaterialTheme.colorScheme.primaryContainer
-                        else
-                            MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Checkbox(
-                            checked = isSelected,
-                            onCheckedChange = { viewModel.toggleStrongTagSentence(index) }
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            sentence,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ====================
-// Phase 4: 連想
-// ====================
-@Composable
-private fun AssociationStepContent(
-    uiState: MaterialAbstractionUiState,
-    viewModel: MaterialAbstractionTrainingViewModel
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
-            )
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    "💭 連想を出す",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    "各タグ文から連想されることを3〜5個書いてください。\n" +
-                            "連想のコツ: 「これを見たときに思い浮かぶ感情・状況・物語」",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        }
-
-        val strongSentences = uiState.strongTagSentenceIndices.mapNotNull { idx ->
-            uiState.generatedTagSentences.getOrNull(idx)?.let { idx to it }
-        }
-
-        if (strongSentences.isEmpty()) {
-            Text(
-                "強いタグ文が選択されていません。前のステップで選択してください。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error
-            )
-        } else {
-            strongSentences.forEachIndexed { displayIndex, (originalIndex, sentence) ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
-                    )
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text(
-                            "タグ文${displayIndex + 1}: $sentence",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        val associations = uiState.inputAssociations[displayIndex] ?: listOf("", "", "", "", "")
-                        associations.take(5).forEachIndexed { assocIndex, assoc ->
-                            OutlinedTextField(
-                                value = assoc,
-                                onValueChange = { viewModel.updateAssociation(displayIndex, assocIndex, it) },
-                                label = { Text("連想${assocIndex + 1}") },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                placeholder = {
-                                    Text(
-                                        when (assocIndex) {
-                                            0 -> "例: 期待"
-                                            1 -> "例: 決断の瞬間"
-                                            2 -> "例: 後戻りできない"
-                                            else -> ""
-                                        }
-                                    )
-                                }
-                            )
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-        }
-    }
-}
-
-// ====================
-// Phase 5: テーマ決定
-// ====================
-@Composable
-private fun ThemeDecisionStepContent(
-    uiState: MaterialAbstractionUiState,
-    viewModel: MaterialAbstractionTrainingViewModel
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
-            )
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    "✨ テーマを決める",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    "連想の中から、最も「伝えたい」抽象テーマを1つ選びます。\n" +
-                            "※この語は最終表現では使いません（禁止ワードになります）",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        }
-
-        // 連想の一覧表示
-        Text("出した連想:", style = MaterialTheme.typography.labelMedium)
-        val allAssociations = uiState.inputAssociations.values.flatten().filter { it.isNotBlank() }
-        if (allAssociations.isNotEmpty()) {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                items(allAssociations) { assoc ->
-                    SuggestionChip(
-                        onClick = { viewModel.updateAbstractTheme(assoc) },
-                        label = { Text(assoc) }
-                    )
-                }
-            }
-        }
-
-        // テーマ候補の提案
-        Text("よく使われるテーマ:", style = MaterialTheme.typography.labelMedium)
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            items(viewModel.dictionary.commonAbstractThemes) { theme ->
-                SuggestionChip(
-                    onClick = { viewModel.updateAbstractTheme(theme) },
-                    label = { Text(theme) }
-                )
-            }
-        }
-
-        OutlinedTextField(
-            value = uiState.inputAbstractTheme,
-            onValueChange = { viewModel.updateAbstractTheme(it) },
-            label = { Text("決定したテーマ") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            placeholder = { Text("例: 期待、孤独、信頼...") }
-        )
-
-        HorizontalDivider()
-
-        // 禁止ワード
-        Text(
-            "禁止ワード（最終表現で使えない語）",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold
-        )
-
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            items(uiState.inputForbiddenWords) { word ->
-                InputChip(
-                    selected = true,
-                    onClick = { viewModel.removeForbiddenWord(word) },
-                    label = { Text(word) },
-                    trailingIcon = { Icon(Icons.Default.Close, null, Modifier.size(16.dp)) }
-                )
-            }
-        }
-
-        var newForbiddenWord by remember { mutableStateOf("") }
-        OutlinedTextField(
-            value = newForbiddenWord,
-            onValueChange = { newForbiddenWord = it },
-            label = { Text("禁止ワードを追加") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            trailingIcon = {
-                IconButton(
-                    onClick = {
-                        viewModel.addForbiddenWord(newForbiddenWord)
-                        newForbiddenWord = ""
-                    },
-                    enabled = newForbiddenWord.isNotBlank()
-                ) {
-                    Icon(Icons.Default.Add, "追加")
-                }
-            }
-        )
-    }
-}
-
-// ====================
-// Phase 6: 最終表現
-// ====================
-@Composable
-private fun FinalExpressionStepContent(
-    uiState: MaterialAbstractionUiState,
-    viewModel: MaterialAbstractionTrainingViewModel
-) {
-    val forbiddenFound = viewModel.checkForbiddenWords()
-
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-            )
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    "🎨 抽象語禁止で表現（3〜5行）",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    "テーマ「${uiState.inputAbstractTheme}」を、その言葉を使わずに表現してください。\n" +
-                            "観察描写＋タグ文＋連想を材料に、150〜300字で。",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        }
-
-        // 禁止ワード警告
-        if (uiState.inputForbiddenWords.isNotEmpty()) {
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
-                )
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text(
-                        "⚠️ 使ってはいけない語",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        uiState.inputForbiddenWords.joinToString("、"),
+                        session.createdAt.take(10),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                }
-            }
-        }
-
-        // 参照情報
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text("参照:", style = MaterialTheme.typography.labelSmall)
-                Text("対象: ${uiState.inputTargetMaterial}", style = MaterialTheme.typography.bodySmall)
-                Text(
-                    "強いタグ文: ${uiState.strongTagSentenceIndices.mapNotNull {
-                        uiState.generatedTagSentences.getOrNull(it)?.take(30)
-                    }.joinToString(" / ")}",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        }
-
-        OutlinedTextField(
-            value = uiState.inputFinalExpression,
-            onValueChange = { viewModel.updateFinalExpression(it) },
-            label = { Text("最終表現（抽象語禁止、3〜5行）") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 200.dp),
-            minLines = 8,
-            isError = forbiddenFound.isNotEmpty(),
-            supportingText = {
-                if (forbiddenFound.isNotEmpty()) {
-                    Text(
-                        "禁止ワードが含まれています: ${forbiddenFound.joinToString("、")}",
-                        color = MaterialTheme.colorScheme.error
-                    )
-                } else {
-                    Text("${uiState.inputFinalExpression.length}文字")
                 }
             },
-            placeholder = {
-                Text(
-                    "例:\n" +
-                            "まだ刃は触れていない。\n" +
-                            "赤と黄色が混ざった皮の下に、白い果肉が閉じ込められている。\n" +
-                            "切れ目が入った瞬間、甘い香りが溢れ出すだろう。\n" +
-                            "その一秒前の、張り詰めた静けさ。\n" +
-                            "取り返しのつかない何かが、もうすぐ始まる。"
+            leadingContent = {
+                Icon(
+                    if (session.isCompleted) Icons.Default.CheckCircle else Icons.Default.Edit,
+                    null,
+                    tint = if (session.isCompleted) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            },
+            trailingContent = {
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Default.Delete, "削除")
+                }
             }
         )
-
-        // スコア表示
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("抽象変換スコア", style = MaterialTheme.typography.labelSmall)
-                Text(
-                    "${uiState.abstractScore}/5",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("描写スコア", style = MaterialTheme.typography.labelSmall)
-                Text(
-                    "${uiState.sensoryScore}/5",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.secondary
-                )
-            }
-        }
-    }
-}
-
-// ====================
-// ナビゲーションボタン
-// ====================
-@Composable
-private fun MaterialAbstractionNavigationButtons(
-    currentStep: MaterialAbstractionStep,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    onSave: () -> Unit,
-    onComplete: () -> Unit
-) {
-    val steps = MaterialAbstractionStep.entries
-    val currentIndex = currentStep.ordinal
-    val isFirstStep = currentIndex == 0
-    val isLastStep = currentIndex == steps.size - 1
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        OutlinedButton(
-            onClick = onPrevious,
-            enabled = !isFirstStep
-        ) {
-            Icon(Icons.Default.ArrowBack, null)
-            Spacer(Modifier.width(8.dp))
-            Text("戻る")
-        }
-
-        Button(onClick = onSave) {
-            Icon(Icons.Default.Save, null)
-            Spacer(Modifier.width(8.dp))
-            Text("保存")
-        }
-
-        if (isLastStep) {
-            Button(
-                onClick = onComplete,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.tertiary
-                )
-            ) {
-                Icon(Icons.Default.Check, null)
-                Spacer(Modifier.width(8.dp))
-                Text("完了")
-            }
-        } else {
-            Button(onClick = onNext) {
-                Text("次へ")
-                Spacer(Modifier.width(8.dp))
-                Icon(Icons.Default.ArrowForward, null)
-            }
-        }
     }
 }
 
@@ -1295,12 +455,11 @@ private fun MaterialAbstractionNavigationButtons(
 // セッションピッカーダイアログ
 // ====================
 @Composable
-private fun MaterialAbstractionSessionPickerDialog(
+private fun SessionPickerDialog(
     sessions: List<MaterialAbstractionSession>,
     onSelect: (MaterialAbstractionSession) -> Unit,
     onNewSession: () -> Unit,
     onDelete: (MaterialAbstractionSession) -> Unit,
-    onShowDetail: (MaterialAbstractionSession) -> Unit,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
@@ -1331,39 +490,18 @@ private fun MaterialAbstractionSessionPickerDialog(
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(300.dp)
+                            .heightIn(max = 300.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(sessions) { session ->
-                            ListItem(
-                                headlineContent = {
-                                    Text(session.sessionTitle.ifEmpty { "無題 #${session.id}" })
+                            SessionCard(
+                                session = session,
+                                onClick = {
+                                    onSelect(session)
+                                    onDismiss()
                                 },
-                                supportingContent = {
-                                    Column {
-                                        Text("対象: ${session.targetMaterial.take(15)}")
-                                        Text(session.createdAt.take(10))
-                                    }
-                                },
-                                leadingContent = {
-                                    Icon(
-                                        if (session.isCompleted) Icons.Default.CheckCircle
-                                        else Icons.Default.Edit,
-                                        null
-                                    )
-                                },
-                                trailingContent = {
-                                    Row {
-                                        IconButton(onClick = { onShowDetail(session) }) {
-                                            Icon(Icons.Default.Visibility, "詳細")
-                                        }
-                                        IconButton(onClick = { onDelete(session) }) {
-                                            Icon(Icons.Default.Delete, "削除")
-                                        }
-                                    }
-                                },
-                                modifier = Modifier.clickable { onSelect(session) }
+                                onDelete = { onDelete(session) }
                             )
-                            HorizontalDivider()
                         }
                     }
                 }
@@ -1377,347 +515,1636 @@ private fun MaterialAbstractionSessionPickerDialog(
 }
 
 // ====================
-// 軸選択ダイアログ
+// 物質→抽象コース フロー
 // ====================
 @Composable
-private fun AxisSelectorDialog(
-    axes: List<MaterialAbstractionDictionary.Axis>,
-    selectedAxes: Set<Int>,
-    onToggle: (Int) -> Unit,
-    onDismiss: () -> Unit
+private fun MaterialToAbstractFlow(
+    uiState: MaterialAbstractionUiState,
+    viewModel: MaterialAbstractionViewModel,
+    modifier: Modifier = Modifier
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("軸を選択（複数可）") },
-        text = {
-            LazyColumn(
+    Column(
+        modifier = modifier.padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // ステップインジケーター
+        M2AStepIndicator(
+            currentStep = uiState.m2aCurrentStep,
+            onStepClick = { viewModel.goToM2AStep(it) }
+        )
+
+        // メインコンテンツ
+        Card(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+        ) {
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(400.dp)
+                    .fillMaxSize()
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState())
             ) {
-                items(axes) { axis ->
-                    val isSelected = axis.id in selectedAxes
-                    ListItem(
-                        headlineContent = {
-                            Text(
-                                "${axis.id}. ${axis.label}",
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                            )
-                        },
-                        supportingContent = {
-                            Column {
-                                Text(
-                                    axis.definition,
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                                Text(
-                                    "例: ${axis.examples.joinToString(", ")}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        },
-                        leadingContent = {
-                            Checkbox(
-                                checked = isSelected,
-                                onCheckedChange = { onToggle(axis.id) }
-                            )
-                        },
-                        modifier = Modifier.clickable { onToggle(axis.id) }
-                    )
-                    HorizontalDivider()
+                when (uiState.m2aCurrentStep) {
+                    MaterialToAbstractStep.MATERIAL_SELECTION -> M2A_Step1_MaterialSelection(uiState, viewModel)
+                    MaterialToAbstractStep.OBSERVATION -> M2A_Step2_Observation(uiState, viewModel)
+                    MaterialToAbstractStep.FEATURE_EXTRACTION -> M2A_Step3_FeatureExtraction(uiState, viewModel)
+                    MaterialToAbstractStep.ASSOCIATION -> M2A_Step4_Association(uiState, viewModel)
+                    MaterialToAbstractStep.CONCEPTUALIZATION -> M2A_Step5_Conceptualization(uiState, viewModel)
+                    MaterialToAbstractStep.EXPRESSION_GENERATION -> M2A_Step6_ExpressionGeneration(uiState, viewModel)
+                    MaterialToAbstractStep.RESULT_DISPLAY -> M2A_Step7_ResultDisplay(uiState, viewModel)
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("完了") }
         }
-    )
+
+        // ナビゲーションボタン
+        M2ANavigationButtons(
+            currentStep = uiState.m2aCurrentStep,
+            onPrevious = { viewModel.previousM2AStep() },
+            onNext = { viewModel.nextM2AStep() },
+            onSave = { viewModel.saveSession() },
+            onFinish = { viewModel.finishTraining() }
+        )
+    }
+}
+
+@Composable
+private fun M2AStepIndicator(
+    currentStep: MaterialToAbstractStep,
+    onStepClick: (MaterialToAbstractStep) -> Unit
+) {
+    val steps = MaterialToAbstractStep.entries.dropLast(1) // 結果表示を除く
+    val currentIndex = currentStep.ordinal
+
+    Column {
+        LinearProgressIndicator(
+            progress = { (currentIndex + 1).toFloat() / (steps.size + 1) },
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            items(steps) { step ->
+                val index = step.ordinal
+                FilterChip(
+                    selected = index == currentIndex,
+                    onClick = { onStepClick(step) },
+                    label = { Text(step.emoji) },
+                    leadingIcon = if (index < currentIndex) {
+                        { Icon(Icons.Default.Check, null, Modifier.size(16.dp)) }
+                    } else null
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            "${currentIndex + 1}/${steps.size}: ${currentStep.displayName}",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            currentStep.description,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun M2ANavigationButtons(
+    currentStep: MaterialToAbstractStep,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onSave: () -> Unit,
+    onFinish: () -> Unit
+) {
+    val isFirstStep = currentStep == MaterialToAbstractStep.MATERIAL_SELECTION
+    val isResultStep = currentStep == MaterialToAbstractStep.RESULT_DISPLAY
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        OutlinedButton(
+            onClick = onPrevious,
+            enabled = !isFirstStep && !isResultStep
+        ) {
+            Icon(Icons.Default.ArrowBack, null)
+            Spacer(Modifier.width(8.dp))
+            Text("戻る")
+        }
+
+        if (!isResultStep) {
+            Button(onClick = onSave) {
+                Icon(Icons.Default.Save, null)
+                Spacer(Modifier.width(8.dp))
+                Text("保存")
+            }
+        }
+
+        if (isResultStep) {
+            Button(
+                onClick = onFinish,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Icon(Icons.Default.Done, null)
+                Spacer(Modifier.width(8.dp))
+                Text("終了")
+            }
+        } else {
+            Button(onClick = onNext) {
+                Text("次へ")
+                Spacer(Modifier.width(8.dp))
+                Icon(Icons.Default.ArrowForward, null)
+            }
+        }
+    }
 }
 
 // ====================
-// タグ選択ダイアログ
+// M2A Step 1: 物質選択
 // ====================
 @Composable
-private fun TagSelectorDialog(
-    recommendedTags: List<MaterialAbstractionDictionary.Tag>,
-    allTags: List<MaterialAbstractionDictionary.Tag>,
-    selectedTags: Set<String>,
-    onToggle: (String) -> Unit,
-    modePreference: String,
-    onModeChange: (String) -> Unit,
-    onDismiss: () -> Unit
+private fun M2A_Step1_MaterialSelection(
+    uiState: MaterialAbstractionUiState,
+    viewModel: MaterialAbstractionViewModel
 ) {
-    var showAll by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
+    val step = MaterialToAbstractStep.MATERIAL_SELECTION
 
-    val displayTags = if (showAll) {
-        if (searchQuery.isBlank()) allTags
-        else allTags.filter {
-            it.label.contains(searchQuery) ||
-                    it.aliases.any { alias -> alias.contains(searchQuery) }
-        }
-    } else {
-        recommendedTags
-    }
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        GuidanceCard(
+            emoji = step.emoji,
+            title = "${step.displayName} - 思考の起点を決める",
+            tips = step.tips
+        )
 
-    // ファセットでグループ化
-    val groupedTags = displayTags.groupBy { it.facet }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("タグを選択") },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                // モード選択
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    FilterChip(
-                        selected = modePreference == "abstract",
-                        onClick = { onModeChange("abstract") },
-                        label = { Text("抽象変換重視") }
-                    )
-                    FilterChip(
-                        selected = modePreference == "sensory",
-                        onClick = { onModeChange("sensory") },
-                        label = { Text("描写重視") }
-                    )
-                }
-
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text("✓ 適切な例:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                Text(
+                    "りんご、スプーン、古い本、枯れた花、手紙、ボタン、靴、カップ、石ころ、鍵",
+                    style = MaterialTheme.typography.bodySmall
+                )
                 Spacer(modifier = Modifier.height(8.dp))
-
-                // 表示切替
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        if (showAll) "全タグ表示中" else "おすすめタグ表示中",
-                        style = MaterialTheme.typography.labelSmall
-                    )
-                    TextButton(onClick = { showAll = !showAll }) {
-                        Text(if (showAll) "おすすめのみ" else "全タグ表示")
-                    }
-                }
-
-                // 検索
-                if (showAll) {
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        label = { Text("検索") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        leadingIcon = { Icon(Icons.Default.Search, null) }
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-
-                // タグ一覧
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(300.dp)
-                ) {
-                    groupedTags.forEach { (facet, tags) ->
-                        item {
-                            Text(
-                                facet,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(vertical = 8.dp)
-                            )
-                        }
-                        items(tags) { tag ->
-                            val isSelected = tag.id in selectedTags
-                            ListItem(
-                                headlineContent = {
-                                    Text(
-                                        tag.label,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                    )
-                                },
-                                supportingContent = if (tag.aliases.isNotEmpty()) {
-                                    { Text(tag.aliases.joinToString(", "), style = MaterialTheme.typography.bodySmall) }
-                                } else null,
-                                leadingContent = {
-                                    Checkbox(
-                                        checked = isSelected,
-                                        onCheckedChange = { onToggle(tag.id) }
-                                    )
-                                },
-                                modifier = Modifier.clickable { onToggle(tag.id) }
-                            )
-                        }
-                    }
-                }
+                Text("✗ 避けるべき例:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                Text(
+                    "愛、幸せ、時間、希望（抽象概念）、星（遠すぎる）、光子（物理学の概念）",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("完了 (${selectedTags.size}件)") }
         }
-    )
+
+        OutlinedTextField(
+            value = uiState.inputMaterial,
+            onValueChange = { viewModel.updateInputMaterial(it) },
+            label = { Text("観察する物質を入力") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            isError = uiState.materialValidationError.isNotBlank(),
+            supportingText = if (uiState.materialValidationError.isNotBlank()) {
+                { Text(uiState.materialValidationError, color = MaterialTheme.colorScheme.error) }
+            } else null,
+            placeholder = { Text("例: りんご、古い手紙、空のボトル...") }
+        )
+
+        InstructionCard(
+            text = "💡 あなたの経験や直感で選んだ物質だからこそ、以降の観察や思考がより深く、より個人的なものになります。"
+        )
+    }
 }
 
 // ====================
-// テンプレート選択ダイアログ
+// M2A Step 2: 観察フェーズ
 // ====================
 @Composable
-private fun TemplateSelectorDialog(
-    templates: List<MaterialAbstractionDictionary.TemplateFrame>,
-    selectedTags: Set<String>,
-    targetMaterial: String,
-    onSelectTemplate: (String, Map<String, String>) -> Unit,
-    onDismiss: () -> Unit
+private fun M2A_Step2_Observation(
+    uiState: MaterialAbstractionUiState,
+    viewModel: MaterialAbstractionViewModel
 ) {
-    var selectedTemplate by remember { mutableStateOf<MaterialAbstractionDictionary.TemplateFrame?>(null) }
-    var customValues by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    val step = MaterialToAbstractStep.OBSERVATION
 
-    // 選択したタグのファセットに関連するテンプレートを優先表示
-    val relevantFacets = selectedTags.mapNotNull { tagId ->
-        MaterialAbstractionDictionary.tags.find { it.id == tagId }?.facet
-    }.toSet()
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        GuidanceCard(
+            emoji = step.emoji,
+            title = "「${uiState.inputMaterial}」を5感で観察",
+            tips = step.tips
+        )
 
-    val sortedTemplates = templates.sortedByDescending { template ->
-        if (template.facet in relevantFacets) 1 else 0
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("テンプレートを選択") },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                if (selectedTemplate == null) {
-                    // テンプレート一覧
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(400.dp)
-                    ) {
-                        items(sortedTemplates) { template ->
-                            val isRelevant = template.facet in relevantFacets
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                                    .clickable { selectedTemplate = template },
-                                colors = CardDefaults.cardColors(
-                                    containerColor = if (isRelevant)
-                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                                    else
-                                        MaterialTheme.colorScheme.surfaceVariant
-                                )
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        AssistChip(
-                                            onClick = {},
-                                            label = { Text(template.facet) }
-                                        )
-                                        if (isRelevant) {
-                                            Spacer(Modifier.width(4.dp))
-                                            Icon(
-                                                Icons.Default.Star,
-                                                "おすすめ",
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        template.text,
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
-                                }
+        // 感覚タブ
+        ScrollableTabRow(
+            selectedTabIndex = uiState.currentSenseTab.ordinal,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            SenseType.entries.forEach { sense ->
+                val hasContent = when (sense) {
+                    SenseType.VISUAL -> uiState.inputObservationVisual.isNotBlank()
+                    SenseType.TACTILE -> uiState.inputObservationTactile.isNotBlank()
+                    SenseType.AUDITORY -> uiState.inputObservationAuditory.isNotBlank()
+                    SenseType.OLFACTORY -> uiState.inputObservationOlfactory.isNotBlank()
+                    SenseType.GUSTATORY -> uiState.inputObservationGustatory.isNotBlank()
+                }
+                Tab(
+                    selected = uiState.currentSenseTab == sense,
+                    onClick = { viewModel.selectSenseTab(sense) },
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("${sense.emoji} ${sense.displayName}")
+                            if (hasContent) {
+                                Spacer(Modifier.width(4.dp))
+                                Icon(Icons.Default.Check, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
                             }
                         }
                     }
-                } else {
-                    // 変数入力画面
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .verticalScroll(rememberScrollState())
-                    ) {
+                )
+            }
+        }
+
+        val currentSense = uiState.currentSenseTab
+
+        // 誘導質問
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+            )
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    "💭 ${currentSense.guidingQuestion}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    currentSense.detailedGuide,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "例: ${currentSense.examples.joinToString(", ")}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+
+        OutlinedTextField(
+            value = when (currentSense) {
+                SenseType.VISUAL -> uiState.inputObservationVisual
+                SenseType.TACTILE -> uiState.inputObservationTactile
+                SenseType.AUDITORY -> uiState.inputObservationAuditory
+                SenseType.OLFACTORY -> uiState.inputObservationOlfactory
+                SenseType.GUSTATORY -> uiState.inputObservationGustatory
+            },
+            onValueChange = {
+                when (currentSense) {
+                    SenseType.VISUAL -> viewModel.updateObservationVisual(it)
+                    SenseType.TACTILE -> viewModel.updateObservationTactile(it)
+                    SenseType.AUDITORY -> viewModel.updateObservationAuditory(it)
+                    SenseType.OLFACTORY -> viewModel.updateObservationOlfactory(it)
+                    SenseType.GUSTATORY -> viewModel.updateObservationGustatory(it)
+                }
+            },
+            label = { Text("${currentSense.displayName}的観察") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 120.dp),
+            minLines = 5,
+            placeholder = { Text("写真のように見えるまで詳しく描写してください...") }
+        )
+
+        // 進捗サマリー
+        ObservationProgressCard(uiState)
+    }
+}
+
+@Composable
+private fun ObservationProgressCard(uiState: MaterialAbstractionUiState) {
+    val filledCount = listOf(
+        uiState.inputObservationVisual,
+        uiState.inputObservationTactile,
+        uiState.inputObservationAuditory,
+        uiState.inputObservationOlfactory,
+        uiState.inputObservationGustatory
+    ).count { it.isNotBlank() }
+
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = if (filledCount >= 3) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+            else MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                "入力状況: $filledCount/5 （最低3つ必要）",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = if (filledCount >= 3) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                SenseType.entries.forEach { sense ->
+                    val hasContent = when (sense) {
+                        SenseType.VISUAL -> uiState.inputObservationVisual.isNotBlank()
+                        SenseType.TACTILE -> uiState.inputObservationTactile.isNotBlank()
+                        SenseType.AUDITORY -> uiState.inputObservationAuditory.isNotBlank()
+                        SenseType.OLFACTORY -> uiState.inputObservationOlfactory.isNotBlank()
+                        SenseType.GUSTATORY -> uiState.inputObservationGustatory.isNotBlank()
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(sense.emoji)
+                        Icon(
+                            if (hasContent) Icons.Default.Check else Icons.Default.Remove,
+                            null,
+                            tint = if (hasContent) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ====================
+// M2A Step 3: 特徴抽出
+// ====================
+@Composable
+private fun M2A_Step3_FeatureExtraction(
+    uiState: MaterialAbstractionUiState,
+    viewModel: MaterialAbstractionViewModel
+) {
+    val step = MaterialToAbstractStep.FEATURE_EXTRACTION
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        GuidanceCard(
+            emoji = step.emoji,
+            title = "「${uiState.inputMaterial}」の特徴を抽出",
+            tips = step.tips
+        )
+
+        // 観点タブ
+        ScrollableTabRow(
+            selectedTabIndex = uiState.currentFeatureAspect.ordinal,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            FeatureAspect.entries.forEach { aspect ->
+                val hasContent = when (aspect) {
+                    FeatureAspect.FORM_AND_STATE -> uiState.inputFeatureFormState.isNotBlank()
+                    FeatureAspect.TIME_PASSAGE -> uiState.inputFeatureTimePassage.isNotBlank()
+                    FeatureAspect.POSITION_AND_PLACEMENT -> uiState.inputFeaturePositionPlacement.isNotBlank()
+                    FeatureAspect.CUSTOM_FEATURE -> uiState.inputFeatureCustom.isNotBlank()
+                }
+                Tab(
+                    selected = uiState.currentFeatureAspect == aspect,
+                    onClick = { viewModel.selectFeatureAspect(aspect) },
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(aspect.displayName, maxLines = 1)
+                            if (hasContent) {
+                                Spacer(Modifier.width(4.dp))
+                                Icon(Icons.Default.Check, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
+                )
+            }
+        }
+
+        val currentAspect = uiState.currentFeatureAspect
+
+        // 誘導質問カード
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
+            )
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    "💭 ${currentAspect.guidingQuestion}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                currentAspect.followUpQuestions.forEach { question ->
+                    Text(
+                        "• $question",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "回答例: ${currentAspect.exampleAnswers.joinToString(" / ")}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+
+        OutlinedTextField(
+            value = when (currentAspect) {
+                FeatureAspect.FORM_AND_STATE -> uiState.inputFeatureFormState
+                FeatureAspect.TIME_PASSAGE -> uiState.inputFeatureTimePassage
+                FeatureAspect.POSITION_AND_PLACEMENT -> uiState.inputFeaturePositionPlacement
+                FeatureAspect.CUSTOM_FEATURE -> uiState.inputFeatureCustom
+            },
+            onValueChange = {
+                when (currentAspect) {
+                    FeatureAspect.FORM_AND_STATE -> viewModel.updateFeatureFormState(it)
+                    FeatureAspect.TIME_PASSAGE -> viewModel.updateFeatureTimePassage(it)
+                    FeatureAspect.POSITION_AND_PLACEMENT -> viewModel.updateFeaturePositionPlacement(it)
+                    FeatureAspect.CUSTOM_FEATURE -> viewModel.updateFeatureCustom(it)
+                }
+            },
+            label = { Text("${currentAspect.displayName}についての回答") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 120.dp),
+            minLines = 5,
+            placeholder = { Text("感情語を使わず、物質的事実として記述してください...") }
+        )
+
+        // 進捗
+        FeatureExtractionProgressCard(uiState)
+
+        // 注意
+        WarningCard(
+            text = "⚠️ ここでは感情語（「寂しい」「悲しい」など）を使わず、純粋に物質的事実として特徴を列挙してください。"
+        )
+    }
+}
+
+@Composable
+private fun FeatureExtractionProgressCard(uiState: MaterialAbstractionUiState) {
+    val filledCount = listOf(
+        uiState.inputFeatureFormState,
+        uiState.inputFeatureTimePassage,
+        uiState.inputFeaturePositionPlacement,
+        uiState.inputFeatureCustom
+    ).count { it.isNotBlank() }
+
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = if (filledCount >= 2) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+            else MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                "抽出状況: $filledCount/4 （最低2つ必要）",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = if (filledCount >= 2) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                listOf(
+                    "形と状態" to uiState.inputFeatureFormState.isNotBlank(),
+                    "時間経過" to uiState.inputFeatureTimePassage.isNotBlank(),
+                    "位置配置" to uiState.inputFeaturePositionPlacement.isNotBlank(),
+                    "その他" to uiState.inputFeatureCustom.isNotBlank()
+                ).forEach { (name, hasContent) ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(name, style = MaterialTheme.typography.labelSmall)
+                        Icon(
+                            if (hasContent) Icons.Default.Check else Icons.Default.Remove,
+                            null,
+                            tint = if (hasContent) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ====================
+// M2A Step 4: 連想フェーズ
+// ====================
+@Composable
+private fun M2A_Step4_Association(
+    uiState: MaterialAbstractionUiState,
+    viewModel: MaterialAbstractionViewModel
+) {
+    val step = MaterialToAbstractStep.ASSOCIATION
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        GuidanceCard(
+            emoji = step.emoji,
+            title = "特徴から感情・概念を連想",
+            tips = step.tips
+        )
+
+        // 各特徴からの連想入力
+        if (uiState.inputFeatureFormState.isNotBlank()) {
+            AssociationInputSection(
+                title = "「形と状態」からの連想",
+                feature = uiState.inputFeatureFormState,
+                value = uiState.inputAssociationFromFormState,
+                onValueChange = { viewModel.updateAssociationFromFormState(it) },
+                placeholder = "例: 傷がある → 過去の痕跡、完璧さの欠如、歴史を抱えている..."
+            )
+        }
+
+        if (uiState.inputFeatureTimePassage.isNotBlank()) {
+            AssociationInputSection(
+                title = "「時間経過」からの連想",
+                feature = uiState.inputFeatureTimePassage,
+                value = uiState.inputAssociationFromTimePassage,
+                onValueChange = { viewModel.updateAssociationFromTimePassage(it) },
+                placeholder = "例: 新鮮さを失う → 価値の低下、衰退の始まり、もう二度と戻らない..."
+            )
+        }
+
+        if (uiState.inputFeaturePositionPlacement.isNotBlank()) {
+            AssociationInputSection(
+                title = "「位置と配置」からの連想",
+                feature = uiState.inputFeaturePositionPlacement,
+                value = uiState.inputAssociationFromPositionPlacement,
+                onValueChange = { viewModel.updateAssociationFromPositionPlacement(it) },
+                placeholder = "例: かごの奥に置かれている → 見落とされている、選ばれない、忘れられている..."
+            )
+        }
+
+        if (uiState.inputFeatureCustom.isNotBlank()) {
+            AssociationInputSection(
+                title = "「その他の特徴」からの連想",
+                feature = uiState.inputFeatureCustom,
+                value = uiState.inputAssociationFromCustom,
+                onValueChange = { viewModel.updateAssociationFromCustom(it) },
+                placeholder = "例: 誰にも手を伸ばされない → 望まれていない、必要とされていない、孤立..."
+            )
+        }
+
+        HorizontalDivider()
+
+        // 最強の連想
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+            )
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    "🎯 最も強く響く連想を一言で",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "すべての連想の中から、最も深く、最も強く自分に響くものは何ですか？\nこれが次のステップで「テーマ」になります。",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+
+        OutlinedTextField(
+            value = uiState.inputStrongestAssociation,
+            onValueChange = { viewModel.updateStrongestAssociation(it) },
+            label = { Text("最強の連想（一言で）") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            placeholder = { Text("例: 孤独、喪失、期待、儚さ...") }
+        )
+
+        // サジェスト
+        if (uiState.suggestedThemes.isNotEmpty()) {
+            Text("関連しそうなテーマ:", style = MaterialTheme.typography.labelMedium)
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(uiState.suggestedThemes) { theme ->
+                    SuggestionChip(
+                        onClick = { viewModel.updateStrongestAssociation(theme) },
+                        label = { Text(theme) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AssociationInputSection(
+    title: String,
+    feature: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        )
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(title, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+            Text(
+                "特徴: ${feature.take(80)}${if (feature.length > 80) "..." else ""}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = value,
+                onValueChange = onValueChange,
+                label = { Text("連想される感情・概念（3〜5個）") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2,
+                placeholder = { Text(placeholder) }
+            )
+        }
+    }
+}
+
+// ====================
+// M2A Step 5: 概念化フェーズ
+// ====================
+@Composable
+private fun M2A_Step5_Conceptualization(
+    uiState: MaterialAbstractionUiState,
+    viewModel: MaterialAbstractionViewModel
+) {
+    val step = MaterialToAbstractStep.CONCEPTUALIZATION
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        GuidanceCard(
+            emoji = step.emoji,
+            title = "テーマの確定",
+            tips = step.tips
+        )
+
+        // 最強の連想の表示
+        if (uiState.inputStrongestAssociation.isNotBlank()) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("最強の連想", style = MaterialTheme.typography.labelSmall)
+                    Text(
+                        "「${uiState.inputStrongestAssociation}」",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        // 既存テーマ一覧
+        Text("既存のテーマから選択:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(EmotionThemeDatabase.getAllThemeNames()) { theme ->
+                FilterChip(
+                    selected = uiState.selectedTheme == theme && !uiState.isCustomTheme,
+                    onClick = { viewModel.selectTheme(theme, false) },
+                    label = { Text(theme) }
+                )
+            }
+        }
+
+        HorizontalDivider()
+
+        // カスタムテーマ
+        Text("または、カスタムテーマを作成:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+
+        OutlinedTextField(
+            value = if (uiState.isCustomTheme) uiState.selectedTheme else "",
+            onValueChange = { viewModel.selectTheme(it, true) },
+            label = { Text("カスタムテーマ名") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            placeholder = { Text("例: 心の空白、忘れられた約束...") }
+        )
+
+        // 選択されたテーマの情報
+        if (uiState.selectedTheme.isNotBlank()) {
+            val themeInfo = EmotionThemeDatabase.getTheme(uiState.selectedTheme)
+
+            if (themeInfo != null && !uiState.isCustomTheme) {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
                         Text(
-                            "テンプレート:",
+                            "「${themeInfo.name}」の定義:",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold
                         )
-                        Card(
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                            )
-                        ) {
-                            Text(
-                                selectedTemplate!!.text,
-                                modifier = Modifier.padding(12.dp),
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
+                        Text(themeInfo.definition, style = MaterialTheme.typography.bodySmall)
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
 
-                        if (selectedTemplate!!.vars.isNotEmpty()) {
-                            Text(
-                                "変数を入力:",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "反対の概念:",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            themeInfo.opposites.joinToString(", "),
+                            style = MaterialTheme.typography.bodySmall
+                        )
 
-                            selectedTemplate!!.vars.forEach { varName ->
-                                val defaultValue = when (varName) {
-                                    "対象" -> targetMaterial
-                                    else -> ""
-                                }
-                                OutlinedTextField(
-                                    value = customValues[varName] ?: defaultValue,
-                                    onValueChange = {
-                                        customValues = customValues + (varName to it)
-                                    },
-                                    label = { Text(varName) },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    singleLine = true
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                            }
-                        }
+                        Spacer(modifier = Modifier.height(8.dp))
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            "⚠️ 次のステップで避けるべき禁止ワード:",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Text(
+                            themeInfo.forbiddenWords.joinToString(", "),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            OutlinedButton(onClick = {
-                                selectedTemplate = null
-                                customValues = emptyMap()
-                            }) {
-                                Text("戻る")
-                            }
-                            Button(onClick = {
-                                onSelectTemplate(selectedTemplate!!.id, customValues)
-                                onDismiss()
-                            }) {
-                                Text("タグ文を生成")
-                            }
-                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            "💡 参考表現例:",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            themeInfo.exampleExpression,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                        )
+                    }
+                }
+            } else if (uiState.isCustomTheme) {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            "カスタムテーマ「${uiState.selectedTheme}」",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "⚠️ 自動生成される禁止ワード:",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Text(
+                            uiState.currentForbiddenWords.joinToString(", "),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
                     }
                 }
             }
-        },
-        confirmButton = {
-            if (selectedTemplate == null) {
-                TextButton(onClick = onDismiss) { Text("キャンセル") }
+        }
+    }
+}
+
+// ====================
+// M2A Step 6: 表現生成
+// ====================
+@Composable
+private fun M2A_Step6_ExpressionGeneration(
+    uiState: MaterialAbstractionUiState,
+    viewModel: MaterialAbstractionViewModel
+) {
+    val step = MaterialToAbstractStep.EXPRESSION_GENERATION
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        GuidanceCard(
+            emoji = step.emoji,
+            title = "禁止ワードを避けて表現",
+            tips = step.tips
+        )
+
+        // テーマと禁止ワード表示
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+            )
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    "テーマ: ${uiState.selectedTheme}",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "⚠️ 禁止ワード: ${uiState.currentForbiddenWords.joinToString(", ")}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
             }
         }
-    )
+
+        // ヒント
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+            )
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    "💡 使える素材:",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("• 物質: ${uiState.inputMaterial}", style = MaterialTheme.typography.bodySmall)
+                Text("• 観察: ${uiState.inputObservationVisual.take(50)}...", style = MaterialTheme.typography.bodySmall)
+                Text("• 特徴: ${uiState.inputFeatureFormState.take(50)}...", style = MaterialTheme.typography.bodySmall)
+            }
+        }
+
+        OutlinedTextField(
+            value = uiState.inputGeneratedExpression,
+            onValueChange = { viewModel.updateGeneratedExpression(it) },
+            label = { Text("3〜5行で表現（禁止ワード禁止）") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 180.dp),
+            minLines = 8,
+            placeholder = { Text("物質の具体的な状態だけで感情を伝える表現を書いてください...") },
+            isError = uiState.forbiddenWordWarnings.isNotEmpty()
+        )
+
+        // 禁止ワード警告
+        if (uiState.forbiddenWordWarnings.isNotEmpty()) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "禁止ワードが含まれています: ${uiState.forbiddenWordWarnings.joinToString(", ")}",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        }
+
+        // 感覚語カウント
+        SensoryWordCountCard(uiState.sensoryWordCounts, uiState.lineCount, uiState.charCount)
+    }
+}
+
+@Composable
+private fun SensoryWordCountCard(counts: Map<String, Int>, lineCount: Int, charCount: Int) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        )
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text("感覚語カウント:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                listOf(
+                    "👁️" to (counts["visual"] ?: 0),
+                    "✋" to (counts["tactile"] ?: 0),
+                    "👂" to (counts["auditory"] ?: 0),
+                    "👃" to (counts["olfactory"] ?: 0),
+                    "👅" to (counts["gustatory"] ?: 0),
+                    "🔄" to (counts["metaphor"] ?: 0)
+                ).forEach { (emoji, count) ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(emoji)
+                        Text(
+                            count.toString(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (count > 0) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                "行数: $lineCount / 文字数: $charCount",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+// ====================
+// M2A Step 7: 結果表示
+// ====================
+@Composable
+private fun M2A_Step7_ResultDisplay(
+    uiState: MaterialAbstractionUiState,
+    viewModel: MaterialAbstractionViewModel
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // 完了バナー
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    Icons.Default.CheckCircle,
+                    null,
+                    modifier = Modifier.size(48.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "トレーニング完了！",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        // サマリー
+        Card {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("📝 結果サマリー", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                ResultItem("物質", uiState.inputMaterial)
+                ResultItem("テーマ", uiState.selectedTheme)
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                Text("生成した表現:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(4.dp))
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Text(
+                        uiState.inputGeneratedExpression.ifBlank { "（未入力）" },
+                        modifier = Modifier.padding(12.dp),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        }
+
+        // 感覚語カウント
+        SensoryWordCountCard(uiState.sensoryWordCounts, uiState.lineCount, uiState.charCount)
+    }
+}
+
+@Composable
+private fun ResultItem(label: String, value: String) {
+    Row(modifier = Modifier.padding(vertical = 4.dp)) {
+        Text("$label: ", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+        Text(value.ifBlank { "（未入力）" }, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+// ====================
+// 抽象→物質コース フロー
+// ====================
+@Composable
+private fun AbstractToMaterialFlow(
+    uiState: MaterialAbstractionUiState,
+    viewModel: MaterialAbstractionViewModel,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // ステップインジケーター
+        A2MStepIndicator(
+            currentStep = uiState.a2mCurrentStep,
+            onStepClick = { viewModel.goToA2MStep(it) }
+        )
+
+        // メインコンテンツ
+        Card(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                when (uiState.a2mCurrentStep) {
+                    AbstractToMaterialStep.THEME_SELECTION -> A2M_Step1_ThemeSelection(uiState, viewModel)
+                    AbstractToMaterialStep.THEME_UNDERSTANDING -> A2M_Step2_ThemeUnderstanding(uiState, viewModel)
+                    AbstractToMaterialStep.MATERIAL_CANDIDATES -> A2M_Step3_MaterialCandidates(uiState, viewModel)
+                    AbstractToMaterialStep.MATERIAL_DECISION -> A2M_Step4_MaterialDecision(uiState, viewModel)
+                    AbstractToMaterialStep.MATERIAL_SPECIFICATION -> A2M_Step5_MaterialSpecification(uiState, viewModel)
+                    AbstractToMaterialStep.DESCRIPTION -> A2M_Step6_Description(uiState, viewModel)
+                    AbstractToMaterialStep.RESULT_DISPLAY -> A2M_Step7_ResultDisplay(uiState, viewModel)
+                }
+            }
+        }
+
+        // ナビゲーションボタン
+        A2MNavigationButtons(
+            currentStep = uiState.a2mCurrentStep,
+            onPrevious = { viewModel.previousA2MStep() },
+            onNext = { viewModel.nextA2MStep() },
+            onSave = { viewModel.saveSession() },
+            onFinish = { viewModel.finishTraining() }
+        )
+    }
+}
+
+@Composable
+private fun A2MStepIndicator(
+    currentStep: AbstractToMaterialStep,
+    onStepClick: (AbstractToMaterialStep) -> Unit
+) {
+    val steps = AbstractToMaterialStep.entries.dropLast(1)
+    val currentIndex = currentStep.ordinal
+
+    Column {
+        LinearProgressIndicator(
+            progress = { (currentIndex + 1).toFloat() / (steps.size + 1) },
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            items(steps) { step ->
+                val index = step.ordinal
+                FilterChip(
+                    selected = index == currentIndex,
+                    onClick = { onStepClick(step) },
+                    label = { Text(step.emoji) },
+                    leadingIcon = if (index < currentIndex) {
+                        { Icon(Icons.Default.Check, null, Modifier.size(16.dp)) }
+                    } else null
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            "${currentIndex + 1}/${steps.size}: ${currentStep.displayName}",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            currentStep.description,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun A2MNavigationButtons(
+    currentStep: AbstractToMaterialStep,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onSave: () -> Unit,
+    onFinish: () -> Unit
+) {
+    val isFirstStep = currentStep == AbstractToMaterialStep.THEME_SELECTION
+    val isResultStep = currentStep == AbstractToMaterialStep.RESULT_DISPLAY
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        OutlinedButton(
+            onClick = onPrevious,
+            enabled = !isFirstStep && !isResultStep
+        ) {
+            Icon(Icons.Default.ArrowBack, null)
+            Spacer(Modifier.width(8.dp))
+            Text("戻る")
+        }
+
+        if (!isResultStep) {
+            Button(onClick = onSave) {
+                Icon(Icons.Default.Save, null)
+                Spacer(Modifier.width(8.dp))
+                Text("保存")
+            }
+        }
+
+        if (isResultStep) {
+            Button(
+                onClick = onFinish,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Icon(Icons.Default.Done, null)
+                Spacer(Modifier.width(8.dp))
+                Text("終了")
+            }
+        } else {
+            Button(onClick = onNext) {
+                Text("次へ")
+                Spacer(Modifier.width(8.dp))
+                Icon(Icons.Default.ArrowForward, null)
+            }
+        }
+    }
+}
+
+// ====================
+// A2M Steps (簡易実装)
+// ====================
+@Composable
+private fun A2M_Step1_ThemeSelection(
+    uiState: MaterialAbstractionUiState,
+    viewModel: MaterialAbstractionViewModel
+) {
+    val step = AbstractToMaterialStep.THEME_SELECTION
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        GuidanceCard(
+            emoji = step.emoji,
+            title = step.displayName,
+            tips = step.tips
+        )
+
+        // ランダム選択ボタン
+        Button(
+            onClick = { viewModel.selectRandomTheme() },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Default.Casino, null)
+            Spacer(Modifier.width(8.dp))
+            Text("ランダムでテーマを選ぶ")
+        }
+
+        HorizontalDivider()
+
+        // テーマ一覧
+        Text("または、テーマを選択:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(EmotionThemeDatabase.getAllThemeNames()) { theme ->
+                FilterChip(
+                    selected = uiState.selectedTheme == theme,
+                    onClick = { viewModel.selectTheme(theme, false) },
+                    label = { Text(theme) }
+                )
+            }
+        }
+
+        // 選択されたテーマ
+        if (uiState.selectedTheme.isNotBlank()) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("選択されたテーマ", style = MaterialTheme.typography.labelSmall)
+                    Text(
+                        "「${uiState.selectedTheme}」",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun A2M_Step2_ThemeUnderstanding(
+    uiState: MaterialAbstractionUiState,
+    viewModel: MaterialAbstractionViewModel
+) {
+    val step = AbstractToMaterialStep.THEME_UNDERSTANDING
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        GuidanceCard(
+            emoji = step.emoji,
+            title = "「${uiState.selectedTheme}」を深く理解する",
+            tips = step.tips
+        )
+
+        OutlinedTextField(
+            value = uiState.inputThemeDefinition,
+            onValueChange = { viewModel.updateThemeDefinition(it) },
+            label = { Text("テーマの定義（自分の言葉で）") },
+            modifier = Modifier.fillMaxWidth(),
+            minLines = 3
+        )
+
+        OutlinedTextField(
+            value = uiState.inputThemeOpposites,
+            onValueChange = { viewModel.updateThemeOpposites(it) },
+            label = { Text("反対の概念") },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("例: 希望の反対 → 諦め、絶望、無関心...") }
+        )
+
+        OutlinedTextField(
+            value = uiState.inputThemeCharacteristics,
+            onValueChange = { viewModel.updateThemeCharacteristics(it) },
+            label = { Text("テーマの特徴・共通点") },
+            modifier = Modifier.fillMaxWidth(),
+            minLines = 2
+        )
+    }
+}
+
+@Composable
+private fun A2M_Step3_MaterialCandidates(
+    uiState: MaterialAbstractionUiState,
+    viewModel: MaterialAbstractionViewModel
+) {
+    val step = AbstractToMaterialStep.MATERIAL_CANDIDATES
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        GuidanceCard(
+            emoji = step.emoji,
+            title = "「${uiState.selectedTheme}」を象徴する物質を3〜5個考える",
+            tips = step.tips
+        )
+
+        // 物質候補入力
+        listOf(
+            0 to uiState.inputMaterialCandidate1,
+            1 to uiState.inputMaterialCandidate2,
+            2 to uiState.inputMaterialCandidate3,
+            3 to uiState.inputMaterialCandidate4,
+            4 to uiState.inputMaterialCandidate5
+        ).forEach { (index, value) ->
+            OutlinedTextField(
+                value = value,
+                onValueChange = { viewModel.updateMaterialCandidate(index, it) },
+                label = { Text("物質候補 ${index + 1}") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                placeholder = { Text("例: 未開封の封筒、発芽前の種子...") }
+            )
+        }
+    }
+}
+
+@Composable
+private fun A2M_Step4_MaterialDecision(
+    uiState: MaterialAbstractionUiState,
+    viewModel: MaterialAbstractionViewModel
+) {
+    val step = AbstractToMaterialStep.MATERIAL_DECISION
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        GuidanceCard(
+            emoji = step.emoji,
+            title = "最も相応しい物質を選ぶ",
+            tips = step.tips
+        )
+
+        val candidates = listOf(
+            uiState.inputMaterialCandidate1,
+            uiState.inputMaterialCandidate2,
+            uiState.inputMaterialCandidate3,
+            uiState.inputMaterialCandidate4,
+            uiState.inputMaterialCandidate5
+        ).filter { it.isNotBlank() }
+
+        candidates.forEachIndexed { index, candidate ->
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { viewModel.selectChosenMaterial(index) },
+                colors = CardDefaults.cardColors(
+                    containerColor = if (uiState.chosenMaterialIndex == index)
+                        MaterialTheme.colorScheme.primaryContainer
+                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = uiState.chosenMaterialIndex == index,
+                        onClick = { viewModel.selectChosenMaterial(index) }
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(candidate, style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+        }
+
+        if (uiState.chosenMaterialIndex >= 0) {
+            OutlinedTextField(
+                value = uiState.inputChosenMaterialReason,
+                onValueChange = { viewModel.updateChosenMaterialReason(it) },
+                label = { Text("この物質を選んだ理由") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2
+            )
+        }
+    }
+}
+
+@Composable
+private fun A2M_Step5_MaterialSpecification(
+    uiState: MaterialAbstractionUiState,
+    viewModel: MaterialAbstractionViewModel
+) {
+    val step = AbstractToMaterialStep.MATERIAL_SPECIFICATION
+    val chosenMaterial = when (uiState.chosenMaterialIndex) {
+        0 -> uiState.inputMaterialCandidate1
+        1 -> uiState.inputMaterialCandidate2
+        2 -> uiState.inputMaterialCandidate3
+        3 -> uiState.inputMaterialCandidate4
+        4 -> uiState.inputMaterialCandidate5
+        else -> ""
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        GuidanceCard(
+            emoji = step.emoji,
+            title = "「$chosenMaterial」の状態を具体化",
+            tips = step.tips
+        )
+
+        OutlinedTextField(
+            value = uiState.inputMaterialState,
+            onValueChange = { viewModel.updateMaterialState(it) },
+            label = { Text("物質の状態") },
+            modifier = Modifier.fillMaxWidth(),
+            minLines = 2,
+            placeholder = { Text("例: 割られる直前の卵（手に持たれている）") }
+        )
+
+        OutlinedTextField(
+            value = uiState.inputMaterialContext,
+            onValueChange = { viewModel.updateMaterialContext(it) },
+            label = { Text("いつ、どこで、誰が") },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("例: 朝、キッチンで、誰かが") }
+        )
+
+        OutlinedTextField(
+            value = uiState.inputMaterialCondition,
+            onValueChange = { viewModel.updateMaterialCondition(it) },
+            label = { Text("物質の条件（新しさ、損傷度など）") },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("例: 新鮮、完璧な状態、ひび一つない") }
+        )
+    }
+}
+
+@Composable
+private fun A2M_Step6_Description(
+    uiState: MaterialAbstractionUiState,
+    viewModel: MaterialAbstractionViewModel
+) {
+    val step = AbstractToMaterialStep.DESCRIPTION
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        GuidanceCard(
+            emoji = step.emoji,
+            title = "5感で具体的に描写",
+            tips = step.tips
+        )
+
+        // テーマと禁止ワード
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+            )
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    "テーマ: ${uiState.selectedTheme}",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "⚠️ 禁止ワード: ${uiState.currentForbiddenWords.joinToString(", ")}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+
+        OutlinedTextField(
+            value = uiState.inputGeneratedExpression,
+            onValueChange = { viewModel.updateGeneratedExpression(it) },
+            label = { Text("3〜5行で描写") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 180.dp),
+            minLines = 8,
+            isError = uiState.forbiddenWordWarnings.isNotEmpty()
+        )
+
+        if (uiState.forbiddenWordWarnings.isNotEmpty()) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "禁止ワードが含まれています: ${uiState.forbiddenWordWarnings.joinToString(", ")}",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        }
+
+        SensoryWordCountCard(uiState.sensoryWordCounts, uiState.lineCount, uiState.charCount)
+    }
+}
+
+@Composable
+private fun A2M_Step7_ResultDisplay(
+    uiState: MaterialAbstractionUiState,
+    viewModel: MaterialAbstractionViewModel
+) {
+    val chosenMaterial = when (uiState.chosenMaterialIndex) {
+        0 -> uiState.inputMaterialCandidate1
+        1 -> uiState.inputMaterialCandidate2
+        2 -> uiState.inputMaterialCandidate3
+        3 -> uiState.inputMaterialCandidate4
+        4 -> uiState.inputMaterialCandidate5
+        else -> ""
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // 完了バナー
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    Icons.Default.CheckCircle,
+                    null,
+                    modifier = Modifier.size(48.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "トレーニング完了！",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        // サマリー
+        Card {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("📝 結果サマリー", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                ResultItem("テーマ", uiState.selectedTheme)
+                ResultItem("選んだ物質", chosenMaterial)
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                Text("生成した描写:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(4.dp))
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Text(
+                        uiState.inputGeneratedExpression.ifBlank { "（未入力）" },
+                        modifier = Modifier.padding(12.dp),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        }
+
+        SensoryWordCountCard(uiState.sensoryWordCounts, uiState.lineCount, uiState.charCount)
+    }
+}
+
+// ====================
+// 共通コンポーネント
+// ====================
+@Composable
+private fun GuidanceCard(
+    emoji: String,
+    title: String,
+    tips: List<String>
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+        )
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(emoji, style = MaterialTheme.typography.headlineSmall)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            tips.forEach { tip ->
+                Text(
+                    "• $tip",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun InstructionCard(text: String) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+        )
+    ) {
+        Text(
+            text,
+            modifier = Modifier.padding(12.dp),
+            style = MaterialTheme.typography.bodySmall
+        )
+    }
+}
+
+@Composable
+private fun WarningCard(text: String) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+        )
+    ) {
+        Text(
+            text,
+            modifier = Modifier.padding(12.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error
+        )
+    }
 }
