@@ -344,6 +344,7 @@ private fun RightPanel(
         SelfQuestioningMode.SIX_HABITS -> {
             // 6つの思考習慣トレーニング
             SixHabitsTrainingContent(
+                onExitTraining = onExitTraining,  // ★追加
                 modifier = modifier
             )
         }
