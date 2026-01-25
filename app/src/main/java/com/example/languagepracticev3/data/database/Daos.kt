@@ -576,33 +576,4 @@ interface AbstractionSessionDao {
     suspend fun getRecentCompleted(limit: Int): List<AbstractionSession>
 }
 
-// 以下を Daos.kt の末尾に追加
-
-// ========== 物質-抽象変換セッション DAO ==========
-@Dao
-interface MaterialAbstractionSessionDao {
-    @Query("SELECT * FROM material_abstraction_sessions ORDER BY updatedAt DESC")
-    fun observeAll(): Flow<List<MaterialAbstractionSession>>
-
-    @Query("SELECT * FROM material_abstraction_sessions WHERE id = :id")
-    suspend fun getById(id: Long): MaterialAbstractionSession?
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(session: MaterialAbstractionSession): Long
-
-    @Update
-    suspend fun update(session: MaterialAbstractionSession)
-
-    @Delete
-    suspend fun delete(session: MaterialAbstractionSession)
-
-    @Query("DELETE FROM material_abstraction_sessions")
-    suspend fun deleteAll()
-
-    @Query("SELECT * FROM material_abstraction_sessions WHERE isCompleted = 0 ORDER BY updatedAt DESC LIMIT 1")
-    suspend fun getLastIncomplete(): MaterialAbstractionSession?
-
-    @Query("SELECT * FROM material_abstraction_sessions WHERE isCompleted = 1 ORDER BY updatedAt DESC LIMIT :limit")
-    suspend fun getRecentCompleted(limit: Int): List<MaterialAbstractionSession>
-}
 
