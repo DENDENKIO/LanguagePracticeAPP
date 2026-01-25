@@ -18,7 +18,8 @@ class DataRepository @Inject constructor(
     private val runLogDao: RunLogDao,
     private val practiceSessionDao: PracticeSessionDao,
     private val compareDao: CompareDao,
-    private val experimentDao: ExperimentDao
+    private val experimentDao: ExperimentDao,
+    private val globalRevisionSessionDao: GlobalRevisionSessionDao  // ★追加
 ) {
     // Work
     suspend fun insertWork(work: Work): Long = workDao.insert(work)
@@ -47,4 +48,28 @@ class DataRepository @Inject constructor(
 
     // CustomRoute
     fun getAllCustomRoutes(): Flow<List<CustomRoute>> = customRouteDao.observeAll()
+
+    // =====================================
+    // ★追加: グローバル・リビジョンセッション
+    // =====================================
+    fun getAllGlobalRevisionSessions(): Flow<List<GlobalRevisionSession>> {
+        return globalRevisionSessionDao.observeAll()
+    }
+
+    suspend fun saveGlobalRevisionSession(session: GlobalRevisionSession): Long {
+        return if (session.id == 0L) {
+            globalRevisionSessionDao.insert(session)
+        } else {
+            globalRevisionSessionDao.update(session)
+            session.id
+        }
+    }
+
+    suspend fun deleteGlobalRevisionSession(session: GlobalRevisionSession) {
+        globalRevisionSessionDao.delete(session)
+    }
+
+    suspend fun getGlobalRevisionSessionById(id: Long): GlobalRevisionSession? {
+        return globalRevisionSessionDao.getById(id)
+    }
 }

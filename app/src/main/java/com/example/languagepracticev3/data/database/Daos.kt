@@ -445,3 +445,28 @@ interface MindsetLabDao {
     @Query("SELECT * FROM ms_review WHERE dayId = :dayId")
     fun getReviewsByDay(dayId: Long): Flow<List<MsReview>>
 }
+
+// =====================================
+// GlobalRevisionSessionDao
+// =====================================
+@Dao
+interface GlobalRevisionSessionDao {
+    @Query("SELECT * FROM global_revision_sessions ORDER BY updatedAt DESC")
+    fun observeAll(): Flow<List<GlobalRevisionSession>>
+
+    @Query("SELECT * FROM global_revision_sessions WHERE id = :id")
+    suspend fun getById(id: Long): GlobalRevisionSession?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(session: GlobalRevisionSession): Long
+
+    @Update
+    suspend fun update(session: GlobalRevisionSession)
+
+    @Delete
+    suspend fun delete(session: GlobalRevisionSession)
+
+    @Query("DELETE FROM global_revision_sessions")
+    suspend fun deleteAll()
+}
+

@@ -33,9 +33,10 @@ import com.example.languagepracticev3.data.model.*
         MsEntry::class,
         MsAiStepLog::class,
         MsReview::class,
-        MsExportLog::class
+        MsExportLog::class,
+        GlobalRevisionSession::class  // ★追加
     ],
-    version = 2,
+    version = 3,  // ★バージョンをインクリメント
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -52,6 +53,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun experimentDao(): ExperimentDao
     abstract fun poetryLabDao(): PoetryLabDao
     abstract fun mindsetLabDao(): MindsetLabDao
+    abstract fun globalRevisionSessionDao(): GlobalRevisionSessionDao  // ★追加
 
     companion object {
         @Volatile
@@ -64,7 +66,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "language_practice_db"
                 )
-                    .fallbackToDestructiveMigration() // ← 追加：マイグレーション失敗時にDBを再作成
+                    .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance
                 instance

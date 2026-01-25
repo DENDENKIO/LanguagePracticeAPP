@@ -1,3 +1,4 @@
+// app/src/main/java/com/example/languagepracticev3/ui/MainScreen.kt
 package com.example.languagepracticev3.ui
 
 import androidx.compose.foundation.layout.*
@@ -18,6 +19,7 @@ import com.example.languagepracticev3.ui.screens.practice.PracticeScreen
 import com.example.languagepracticev3.ui.screens.routes.RoutesScreen
 import com.example.languagepracticev3.ui.screens.settings.SettingsScreen
 import com.example.languagepracticev3.ui.screens.workbench.WorkbenchScreen
+import com.example.languagepracticev3.ui.screens.selfquestioning.SelfQuestioningScreen  // ★追加
 import com.example.languagepracticev3.viewmodel.MainViewModel
 import com.example.languagepracticev3.viewmodel.Screen
 
@@ -39,6 +41,7 @@ fun MainScreen(
         NavigationItem(Screen.WORKBENCH, "作業台", Icons.Default.Build),
         NavigationItem(Screen.ROUTES, "ルート", Icons.Default.Route),
         NavigationItem(Screen.PRACTICE, "練習", Icons.Default.FitnessCenter),
+        NavigationItem(Screen.SELF_QUESTIONING, "自問自答", Icons.Default.Psychology, MaterialTheme.colorScheme.tertiary),  // ★追加
         NavigationItem(Screen.EXPERIMENT, "実験", Icons.Default.Science),
         NavigationItem(Screen.LIBRARY, "ライブラリ", Icons.Default.LibraryBooks),
         NavigationItem(Screen.COMPARE, "比較", Icons.Default.Compare),
@@ -61,7 +64,8 @@ fun MainScreen(
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
                 navigationItems.forEachIndexed { index, item ->
-                    if (index == 6) {
+                    // ★修正: index == 7 に変更（PoetryLab/MindsetLabの前に区切り線）
+                    if (index == 7) {
                         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     }
 
@@ -92,7 +96,6 @@ fun MainScreen(
             color = MaterialTheme.colorScheme.background
         ) {
             when (currentScreen) {
-                // ★ここを修正: SettingsScreenにonNavigateToLibraryを渡す
                 Screen.SETTINGS -> SettingsScreen(
                     onNavigateToLibrary = {
                         viewModel.navigateTo(Screen.LIBRARY)
@@ -106,6 +109,7 @@ fun MainScreen(
                 Screen.COMPARE -> CompareScreen()
                 Screen.POETRY_LAB -> PoetryLabScreen()
                 Screen.MINDSET_LAB -> MindsetLabScreen()
+                Screen.SELF_QUESTIONING -> SelfQuestioningScreen()  // ★追加
             }
         }
     }

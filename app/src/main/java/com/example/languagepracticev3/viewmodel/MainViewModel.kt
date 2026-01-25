@@ -1,3 +1,4 @@
+// app/src/main/java/com/example/languagepracticev3/viewmodel/MainViewModel.kt
 package com.example.languagepracticev3.viewmodel
 
 import androidx.lifecycle.ViewModel
@@ -16,7 +17,8 @@ enum class Screen {
     LIBRARY,
     COMPARE,
     POETRY_LAB,
-    MINDSET_LAB
+    MINDSET_LAB,
+    SELF_QUESTIONING  // ★追加: 自問自答
 }
 
 @HiltViewModel
@@ -38,4 +40,5 @@ class MainViewModel @Inject constructor() : ViewModel() {
     fun showCompare() = navigateTo(Screen.COMPARE)
     fun showPoetryLab() = navigateTo(Screen.POETRY_LAB)
     fun showMindsetLab() = navigateTo(Screen.MINDSET_LAB)
+    fun showSelfQuestioning() = navigateTo(Screen.SELF_QUESTIONING)  // ★追加
 }

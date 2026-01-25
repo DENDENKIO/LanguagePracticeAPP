@@ -83,4 +83,10 @@ object AppModule {
     fun provideMindsetLabDao(database: AppDatabase): MindsetLabDao {
         return database.mindsetLabDao()
     }
+
+    // ★追加
+    @Provides
+    fun provideGlobalRevisionSessionDao(database: AppDatabase): GlobalRevisionSessionDao {
+        return database.globalRevisionSessionDao()
+    }
 }
