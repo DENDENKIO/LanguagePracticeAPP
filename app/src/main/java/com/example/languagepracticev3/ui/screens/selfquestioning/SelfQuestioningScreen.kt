@@ -19,7 +19,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.languagepracticev3.data.model.GlobalRevisionSession
 import com.example.languagepracticev3.data.model.GlobalRevisionStep
 import com.example.languagepracticev3.ui.screens.selfquestioning.trainings.SixHabitsTrainingContent
-import com.example.languagepracticev3.ui.screens.selfquestioning.trainings.AbstractionTrainingContent  // ★追加
+import com.example.languagepracticev3.ui.screens.selfquestioning.trainings.AbstractionTrainingContent
+import com.example.languagepracticev3.ui.screens.selfquestioning.trainings.MaterialAbstractionTrainingContent  // ★追加
 import com.example.languagepracticev3.viewmodel.SelfQuestioningMode
 import com.example.languagepracticev3.viewmodel.SelfQuestioningUiState
 import com.example.languagepracticev3.viewmodel.SelfQuestioningViewModel
@@ -76,7 +77,7 @@ fun SelfQuestioningScreen(
             RightPanel(
                 uiState = uiState,
                 viewModel = viewModel,
-                onExitTraining = { viewModel.clearMode() },  // ★追加: トレーニング中断時のコールバック
+                onExitTraining = { viewModel.clearMode() },
                 modifier = Modifier
                     .weight(2f)
                     .fillMaxHeight()
@@ -107,7 +108,8 @@ private fun LeftPanel(
 ) {
     Column(
         modifier = modifier
-            .padding(16.dp),
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),  // ★追加: スクロール可能に
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
@@ -195,7 +197,7 @@ private fun LeftPanel(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // ★追加: 抽象化テクニック ボタン
+        // 抽象化テクニック ボタン
         ElevatedButton(
             onClick = { onSelectMode(SelfQuestioningMode.ABSTRACTION) },
             modifier = Modifier.fillMaxWidth(),
@@ -229,7 +231,43 @@ private fun LeftPanel(
             }
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // ★追加: 物質-抽象変換 ボタン
+        ElevatedButton(
+            onClick = { onSelectMode(SelfQuestioningMode.MATERIAL_ABSTRACTION) },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.elevatedButtonColors(
+                containerColor = if (selectedMode == SelfQuestioningMode.MATERIAL_ABSTRACTION)
+                    MaterialTheme.colorScheme.errorContainer
+                else
+                    MaterialTheme.colorScheme.surface
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    Icons.Default.Transform,
+                    contentDescription = null,
+                    modifier = Modifier.size(32.dp),
+                    tint = MaterialTheme.colorScheme.error
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "物質-抽象変換",
+                    style = MaterialTheme.typography.titleSmall
+                )
+                Text(
+                    "具体から感情を引き出す",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         // 説明カード
         Card(
@@ -266,7 +304,6 @@ private fun LeftPanel(
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
-                    // ★追加: 抽象化テクニックの説明
                     SelfQuestioningMode.ABSTRACTION -> {
                         Text(
                             "抽象化テクニックとは",
@@ -278,6 +315,21 @@ private fun LeftPanel(
                             "「具体」と「抽象」を意識的に往復させることで、" +
                                     "表面的な描写から多層的な意味を持つ文章へと進化させます。\n" +
                                     "Show, Don't Tell、メタファー、感覚的詳細を活用します。",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    // ★追加: 物質-抽象変換の説明
+                    SelfQuestioningMode.MATERIAL_ABSTRACTION -> {
+                        Text(
+                            "物質-抽象変換とは",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "日常の身近な物質を観察し、その特徴から感情を引き出し、" +
+                                    "禁止ワードを避けながら表現するプロセスです。\n" +
+                                    "7つのステップで「具体→抽象→具体」を往復します。",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
@@ -306,7 +358,7 @@ private fun LeftPanel(
 private fun RightPanel(
     uiState: SelfQuestioningUiState,
     viewModel: SelfQuestioningViewModel,
-    onExitTraining: () -> Unit,  // ★追加
+    onExitTraining: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     when (uiState.selectedMode) {
@@ -344,13 +396,20 @@ private fun RightPanel(
         SelfQuestioningMode.SIX_HABITS -> {
             // 6つの思考習慣トレーニング
             SixHabitsTrainingContent(
-                onExitTraining = onExitTraining,  // ★追加
+                onExitTraining = onExitTraining,
                 modifier = modifier
             )
         }
-        // ★追加: 抽象化テクニック
         SelfQuestioningMode.ABSTRACTION -> {
+            // 抽象化テクニック
             AbstractionTrainingContent(
+                onExitTraining = onExitTraining,
+                modifier = modifier
+            )
+        }
+        // ★追加: 物質-抽象変換
+        SelfQuestioningMode.MATERIAL_ABSTRACTION -> {
+            MaterialAbstractionTrainingContent(
                 onExitTraining = onExitTraining,
                 modifier = modifier
             )
@@ -421,11 +480,6 @@ private fun GlobalRevisionTrainingContent(
         }
     }
 }
-
-// 以下、元のコードのSessionStartScreen, SessionCard, StepIndicator,
-// CoreDefinitionStep, DetectionStep, DiagnosisStep, RevisionPlanStep,
-// ReverseOutlineStep, NavigationButtons, SessionPickerDialog は変更なし
-// （省略 - 元のコードをそのまま使用）
 
 // ====================
 // セッション開始画面

@@ -111,4 +111,13 @@ object AppModule {
     fun provideAbstractionSessionDao(database: AppDatabase): AbstractionSessionDao {
         return database.abstractionSessionDao()
     }
+
+    // AppModule.kt に以下を追加
+
+    @Provides
+    @Singleton
+    fun provideMaterialAbstractionSessionDao(database: AppDatabase): MaterialAbstractionSessionDao {
+        return database.materialAbstractionSessionDao()
+    }
+
 }

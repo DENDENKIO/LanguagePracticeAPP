@@ -195,3 +195,41 @@ class DataRepository @Inject constructor(
         return abstractionSessionDao.getRecentCompleted(limit)
     }
 }
+
+// DataRepository.kt のコンストラクタに追加
+// private val materialAbstractionSessionDao: MaterialAbstractionSessionDao
+
+// 以下のメソッドを DataRepository.kt の末尾に追加
+
+// =====================================
+// 物質-抽象変換セッション
+// =====================================
+
+fun getAllMaterialAbstractionSessions(): Flow<List<MaterialAbstractionSession>> {
+    return materialAbstractionSessionDao.observeAll()
+}
+
+suspend fun getMaterialAbstractionSessionById(id: Long): MaterialAbstractionSession? {
+    return materialAbstractionSessionDao.getById(id)
+}
+
+suspend fun saveMaterialAbstractionSession(session: MaterialAbstractionSession): Long {
+    return if (session.id == 0L) {
+        materialAbstractionSessionDao.insert(session)
+    } else {
+        materialAbstractionSessionDao.update(session)
+        session.id
+    }
+}
+
+suspend fun deleteMaterialAbstractionSession(session: MaterialAbstractionSession) {
+    materialAbstractionSessionDao.delete(session)
+}
+
+suspend fun getLastIncompleteMaterialAbstractionSession(): MaterialAbstractionSession? {
+    return materialAbstractionSessionDao.getLastIncomplete()
+}
+
+suspend fun getRecentCompletedMaterialAbstractionSessions(limit: Int): List<MaterialAbstractionSession> {
+    return materialAbstractionSessionDao.getRecentCompleted(limit)
+}

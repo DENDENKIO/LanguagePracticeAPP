@@ -23,7 +23,8 @@ enum class SelfQuestioningMode {
     NONE,
     GLOBAL_REVISION,
     SIX_HABITS,  // ★追加
-    ABSTRACTION  // ★追加: 抽象化テクニック
+    ABSTRACTION,  // ★追加: 抽象化テクニック
+    MATERIAL_ABSTRACTION  // ★追加: 物質-抽象変換プロセス
 }
 
 /**
